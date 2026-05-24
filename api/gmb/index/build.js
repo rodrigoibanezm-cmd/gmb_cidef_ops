@@ -1,13 +1,22 @@
 import { buildGmbIndexes } from "../../../lib/gmb/indexBuilder.js";
 
+function requireTenantId(req) {
+  const tenantId = req.query.tenant_id || req.query.tenant;
+  return typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
   }
 
+  const tenantId = requireTenantId(req);
+  if (!tenantId) {
+    return res.status(400).json({ ok: false, error: "tenant_id_required" });
+  }
+
   try {
     const date = req.query.date || undefined;
-    const tenantId = req.query.tenant || req.query.tenant_id || "cidef";
 
     const result = await buildGmbIndexes({ date, tenantId });
 
