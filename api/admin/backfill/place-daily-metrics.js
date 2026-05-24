@@ -22,6 +22,11 @@ function todayChile() {
   }).format(new Date());
 }
 
+function requireTenantId(req) {
+  const tenantId = req.query.tenant_id || req.query.tenant;
+  return typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+}
+
 async function upsertMetric({ tenantId, place, date, snapshot }) {
   await dbQuery(
     `insert into place_daily_metrics (
@@ -55,8 +60,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
   }
 
+  const tenantId = requireTenantId(req);
+  if (!tenantId) {
+    return res.status(400).json({ ok: false, error: "tenant_id_required" });
+  }
+
   const date = req.query.date || todayChile();
-  const tenantId = req.query.tenant_id || req.query.tenant || "cidef";
 
   try {
     const places = await resolvePlacesFromPostgres({
