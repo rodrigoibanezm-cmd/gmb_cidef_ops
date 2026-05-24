@@ -196,6 +196,7 @@ export default async function handler(req, res) {
 
   const batches = [];
   const allErrors = [];
+  const attemptedSet = new Set();
   let processed = 0;
   let saved = 0;
   let failed = 0;
@@ -206,15 +207,16 @@ export default async function handler(req, res) {
     runId = await createRun({ tenantId, date, limit, pauseMs, maxBatches });
 
     let existingSet = await readExistingSnapshotIds({ tenantId, date });
-    let missing = places.filter((place) => !existingSet.has(place.place_id));
+    let pending = places.filter((place) => !existingSet.has(place.place_id));
 
-    for (let batchNumber = 1; batchNumber <= maxBatches && missing.length > 0; batchNumber += 1) {
-      const batch = missing.slice(0, limit);
+    for (let batchNumber = 1; batchNumber <= maxBatches && pending.length > 0; batchNumber += 1) {
+      const batch = pending.slice(0, limit);
       let batchSaved = 0;
       let batchFailed = 0;
       const batchErrors = [];
 
       for (const place of batch) {
+        attemptedSet.add(place.place_id);
         processed += 1;
         try {
           const data = await fetchPlace(place.place_id);
@@ -237,24 +239,25 @@ export default async function handler(req, res) {
         }
       }
 
-      missing = places.filter((place) => !existingSet.has(place.place_id));
+      pending = places.filter((place) => !existingSet.has(place.place_id) && !attemptedSet.has(place.place_id));
 
       batches.push({
         batch: batchNumber,
         processed: batch.length,
         saved: batchSaved,
         failed: batchFailed,
-        remaining: missing.length,
-        done: missing.length === 0,
+        remaining_unattempted: pending.length,
+        done: pending.length === 0,
         errors: batchErrors.slice(0, 5),
       });
 
-      if (missing.length === 0) break;
+      if (pending.length === 0) break;
       await sleep(pauseMs);
     }
 
-    const done = missing.length === 0;
-    const status = done ? "done" : "partial";
+    const remainingUnattempted = pending.length;
+    const done = remainingUnattempted === 0;
+    const status = failed > 0 ? "partial" : "done";
     await finishRun({ runId, status, totalPlaces: places.length, processed, saved, failed, errors: allErrors });
 
     return res.status(200).json({
@@ -266,7 +269,8 @@ export default async function handler(req, res) {
       processed,
       saved,
       failed,
-      missing: missing.length,
+      missing: places.length - existingSet.size,
+      remaining_unattempted: remainingUnattempted,
       done,
       runtime_ready: saved > 0 || existingSet.size > 0,
       batches,
