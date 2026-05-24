@@ -21,6 +21,11 @@ function hasConfirm(req) {
   return req.query.confirm === "true";
 }
 
+function requireTenantId(req) {
+  const tenantId = req.query.tenant_id || req.query.tenant;
+  return typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+}
+
 async function readRun(date, tenantId) {
   const raw = await redisCommand(["GET", gmbCaptureKeys.reviewsRun(date, tenantId)]);
   return raw ? JSON.parse(raw) : null;
@@ -56,9 +61,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: "reviews_capture_requires_confirm" });
   }
 
+  const tenantId = requireTenantId(req);
+  if (!tenantId) {
+    return res.status(400).json({ ok: false, error: "tenant_id_required" });
+  }
+
   try {
     const date = today();
-    const tenantId = req.query.tenant || req.query.tenant_id || "cidef";
     const limit = parseNumber(req.query.limit, 10);
     const run = await readRun(date, tenantId);
     const result = await capturePlacesReviews({ limit, tenantId });
