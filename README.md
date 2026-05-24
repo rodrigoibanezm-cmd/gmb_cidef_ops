@@ -86,6 +86,8 @@ Los siguientes endpoints quedaron removidos:
 ```txt
 /api/gmb/update/light
 /api/gmb/update/full
+/api/gmb/capture/demo-next
+/api/gmb/capture/reviews-next
 ```
 
 Respuesta:
