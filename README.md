@@ -34,8 +34,8 @@ gmb_cidef
 
 ```txt
 Neon/Postgres
-Upstash Redis
 Google Places API
+Upstash Redis legacy temporal
 ```
 
 ## Principio operativo
@@ -44,127 +44,79 @@ Google Places API
 1 acción operacional = 1 endpoint.
 El agente consulta.
 Ops mantiene los datos.
+Neon es el plano principal de datos.
+Redis no debe estar en el camino crítico.
 ```
 
-## Uso recomendado
+## Uso recomendado actual
 
-### Actualización barata completa
+### Actualización barata Neon
 
-Endpoint recomendado para operación diaria barata:
+Endpoint recomendado para operación diaria barata mientras Redis está fuera del camino crítico:
 
 ```txt
-POST /api/gmb/update/light
+POST /api/gmb/update/light-neon
 ```
 
-Hace todo el flujo:
+Hace:
 
 ```txt
 captura barata Google Places
-loop interno por lotes
-pausa entre lotes
-snapshot Redis
-índice Redis
-backfill Neon place_daily_metrics
+place_snapshots en Neon
+place_daily_metrics en Neon
 runtime listo
 ```
 
-Uso:
+No toca:
+
+```txt
+Upstash Redis
+índices Redis
+backfill Redis -> Neon
+```
+
+Uso unitario:
 
 ```powershell
 $ops = "https://gmb-cidef-ops.vercel.app"
 
 Invoke-RestMethod `
-  "$ops/api/gmb/update/light?tenant_id=cidef&limit=20" `
+  "$ops/api/gmb/update/light-neon?tenant_id=cidef&limit=30&max_batches=1" `
   -Method POST |
-  ConvertTo-Json -Depth 20 |
-  Out-File ".\cidef_update_light.json" -Encoding utf8
+  ConvertTo-Json -Depth 30 |
+  Out-File ".\cidef_light_neon_test.json" -Encoding utf8
 ```
 
-Parámetros:
+Validación operativa 2026-05-24:
 
 ```txt
-tenant_id   requerido operativo
-limit       default 20
-pause_ms    default 5000
-max_batches default 100
+limit=30 funcionó bien en Sodimac.
+Sodimac completó 161 places con failed=0.
+CIDEF quedó cargado en Neon con carga barata.
+```
+
+Nota operativa:
+
+```txt
+Por ahora limit=30 + max_batches=1 es el tamaño validado para evitar timeout de Vercel.
+Para front/admin, el botón debe disparar una tanda y repetir cada 5 segundos hasta done=true.
 ```
 
 Salida esperada:
 
 ```txt
-ok=true
-flow="Redis snapshot barato -> Redis index -> Neon runtime"
-index.snapshots > 0
-backfill.inserted > 0
-backfill.missing = 0 idealmente
+runtime_ready=true
+flow="Google Places light -> Neon place_snapshots + place_daily_metrics"
+failed=0 idealmente
 ```
 
-### Actualización completa / cara con reviews
+## Flujo Redis legacy
 
-Endpoint recomendado para captura con reseñas:
+Los siguientes endpoints existen, pero no son el flujo recomendado mientras Upstash esté limitado o mientras se migra a Neon-first.
 
 ```txt
-POST /api/gmb/update/full?confirm=true
-```
-
-Hace todo el flujo:
-
-```txt
-captura Google Places con reviews
-loop interno por lotes
-pausa entre lotes
-snapshot Redis
-reviews Redis
-índice Redis
-backfill Neon place_daily_metrics
-runtime listo
-```
-
-Uso:
-
-```powershell
-$ops = "https://gmb-cidef-ops.vercel.app"
-
-Invoke-RestMethod `
-  "$ops/api/gmb/update/full?tenant_id=cidef&limit=10&confirm=true" `
-  -Method POST |
-  ConvertTo-Json -Depth 20 |
-  Out-File ".\cidef_update_full.json" -Encoding utf8
-```
-
-Regla:
-
-```txt
-confirm=true es obligatorio porque captura reviews y puede tener mayor costo.
-```
-
-Parámetros:
-
-```txt
-tenant_id   requerido operativo
-limit       default 10
-pause_ms    default 5000
-max_batches default 100
-confirm     true obligatorio
-```
-
-Salida esperada:
-
-```txt
-ok=true
-flow="Redis snapshot completo + reviews -> Redis index -> Neon runtime"
-index.snapshots > 0
-index.reviews >= 0
-backfill.inserted > 0
-backfill.missing = 0 idealmente
-```
-
-## Endpoints operativos internos / legacy
-
-Estos endpoints siguen existiendo para debug, validación o ejecución manual por partes.
-No son el flujo recomendado normal.
-
-```txt
+/api/gmb/update/light
+/api/gmb/update/full
 /api/gmb/capture/demo-next
 /api/gmb/capture/reviews-next
 /api/admin/backfill/place-daily-metrics
@@ -172,73 +124,58 @@ No son el flujo recomendado normal.
 /api/gmb/index/status
 ```
 
-## Captura barata legacy
+## Actualización barata Redis legacy
 
 ```txt
-POST /api/gmb/capture/demo-next
+POST /api/gmb/update/light
 ```
 
-Uso unitario/debug:
-
-```powershell
-$ops = "https://gmb-cidef-ops.vercel.app"
-
-$result = Invoke-RestMethod `
-  "$ops/api/gmb/capture/demo-next?tenant_id=sodimac&limit=1" `
-  -Method POST
-
-$result | ConvertTo-Json -Depth 20 | Out-File ".\ops_capture_demo_test.json" -Encoding utf8
-```
-
-Validado:
+Hace:
 
 ```txt
-tenant_id = sodimac
-captured_date = 2026-05-22
-total = 161
-processed = 1
-saved = 1
-failed = 0
+captura barata Google Places
+snapshot Redis
+índice Redis
+backfill Neon place_daily_metrics
+runtime listo
 ```
 
-## Captura cara / reviews legacy
+Estado:
 
 ```txt
-POST /api/gmb/capture/reviews-next?confirm=true
+legacy / no recomendado como operación principal
 ```
 
-Regla:
+## Actualización completa / cara Redis legacy
 
 ```txt
-reviews requiere confirm=true
+POST /api/gmb/update/full?confirm=true
 ```
 
-## Backfill Neon manual
+Hace:
 
 ```txt
-POST /api/admin/backfill/place-daily-metrics
+captura Google Places con reviews
+snapshot Redis
+reviews Redis
+índice Redis
+backfill Neon place_daily_metrics
+runtime listo
 ```
 
-Validado:
+Estado:
 
 ```txt
-sodimac 2026-05-21: inserted=161, missing=0, failed=0
-cidef 2026-05-21: inserted=727, missing=0, failed=0
+legacy / pendiente reemplazo por full-neon
 ```
 
-## Indexación Redis manual
+## Pendiente inmediato
 
 ```txt
-POST /api/gmb/index/build
-GET  /api/gmb/index/status
-```
-
-Validado para Sodimac:
-
-```txt
-snapshots = 161
-indexed_places = 161
-updated = true
+/api/gmb/update/full-neon
+runtime evidencia -> Neon
+front/admin operativo
+migración Redis legacy -> Neon cuando vuelva la cuota
 ```
 
 ## Librerías operacionales
@@ -268,8 +205,6 @@ region = región
 
 ```txt
 DATABASE_URL
-KV_REST_API_URL
-KV_REST_API_TOKEN
 GOOGLE_PLACES_API_KEY
 ```
 
@@ -281,6 +216,13 @@ GOOGLE_MAPS_API_KEY
 
 como fallback para captura.
 
+Legacy Redis requiere además:
+
+```txt
+KV_REST_API_URL
+KV_REST_API_TOKEN
+```
+
 ## Objetivo arquitectónico
 
 ```txt
@@ -288,5 +230,7 @@ runtime limpio y liviano
 ops separado
 menos funciones Vercel en runtime
 captura desacoplada del agente
-operación diaria en un solo endpoint
+operación diaria en endpoint simple
+Neon como plano único de datos
+Redis fuera del camino crítico
 ```
