@@ -19,6 +19,11 @@ function parsePositiveInt(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function requireTenantId(req) {
+  const tenantId = req.query.tenant_id || req.query.tenant;
+  return typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -113,7 +118,11 @@ export default async function handler(req, res) {
     });
   }
 
-  const tenantId = req.query.tenant_id || req.query.tenant || "cidef";
+  const tenantId = requireTenantId(req);
+  if (!tenantId) {
+    return res.status(400).json({ ok: false, error: "tenant_id_required" });
+  }
+
   const limit = parsePositiveInt(req.query.limit, 10);
   const pauseMs = parsePositiveInt(req.query.pause_ms, 5000);
   const maxBatches = parsePositiveInt(req.query.max_batches, 100);
