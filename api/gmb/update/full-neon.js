@@ -268,6 +268,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: "tenant_id_required" });
   }
 
+  if (!getGoogleApiKey()) {
+    return res.status(500).json({ ok: false, error: "google_api_key_missing" });
+  }
+
   const date = req.query.date || todayChile();
   const limit = parsePositiveInt(req.query.limit, 10);
   const pauseMs = parsePositiveInt(req.query.pause_ms, 5000);
@@ -342,11 +346,12 @@ export default async function handler(req, res) {
 
     const remainingUnattempted = pending.length;
     const done = remainingUnattempted === 0;
-    const status = failed > 0 ? "partial" : "done";
+    const status = !done ? "incomplete" : failed > 0 ? "partial" : "done";
     await finishRun({ runId, status, totalPlaces: places.length, processed, saved, failed, reviewsSaved, errors: allErrors });
 
     return res.status(200).json({
-      ok: done,
+      ok: done && failed === 0,
+      status,
       tenant_id: tenantId,
       date,
       run_id: runId,
