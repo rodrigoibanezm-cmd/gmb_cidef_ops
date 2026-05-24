@@ -5,6 +5,11 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function requireTenantId(req) {
+  const tenantId = req.query.tenant_id || req.query.tenant;
+  return typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+}
+
 function safeJson(value) {
   if (!value) return null;
   if (typeof value === "object") return value;
@@ -34,9 +39,13 @@ function snapshotPlaceId(date, key, tenantId) {
 }
 
 export default async function handler(req, res) {
+  const tenantId = requireTenantId(req);
+  if (!tenantId) {
+    return res.status(400).json({ ok: false, error: "tenant_id_required" });
+  }
+
   try {
     const date = req.query.date || today();
-    const tenantId = req.query.tenant || req.query.tenant_id || "cidef";
 
     const snapshotKeys = await scanKeys(gmbCaptureKeys.snapshot(date, "*", tenantId));
     const indexedPlaceIds = safeJson(await redisCommand(["GET", gmbCaptureKeys.index(date, "place_ids", tenantId)])) || [];
