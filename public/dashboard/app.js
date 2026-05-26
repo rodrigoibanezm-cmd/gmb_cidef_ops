@@ -58,23 +58,61 @@ function kpi(title, value, sub, tint, valueClass = '') {
   return card;
 }
 
-function actionCards(data) {
+function actionItems(data) {
   const k = data.kpis || {};
   const p = data.mobile_priority || {};
+  return [
+    { label: 'Tiendas críticas', value: p.critical_count ?? k.critical_stores, cls: '', items: data.red_flags || [] },
+    { label: 'Deterioro acelerado', value: p.accelerating_count ?? 0, cls: 'warn-tile', items: data.movements?.down || [] },
+    { label: 'Requieren intervención', value: p.immediate_action_count ?? 0, cls: '', items: (data.red_flags || []).slice(0, p.immediate_action_count || 2) }
+  ];
+}
+
+function actionCards(data) {
   const card = el('section', 'card action-card');
   const head = add(card, el('div', 'card-head'));
   add(head, el('div', 'micro', 'Acción inmediata'));
-  const tiles = add(card, el('div', 'card-body action-grid'));
-  [
-    ['Tiendas críticas', p.critical_count ?? k.critical_stores, ''],
-    ['Deterioro acelerado', p.accelerating_count ?? 0, 'warn-tile'],
-    ['Requieren intervención', p.immediate_action_count ?? 0, '']
-  ].forEach(([label, value, cls]) => {
-    const tile = add(tiles, el('div', `action-tile ${cls}`));
-    add(tile, el('strong', '', int(value)));
-    add(tile, el('span', '', label));
+  const body = add(card, el('div', 'card-body'));
+  const tiles = add(body, el('div', 'action-grid'));
+  const detail = add(body, el('div', 'action-detail'));
+
+  actionItems(data).forEach((action, index) => {
+    const tile = add(tiles, el('button', `action-tile ${action.cls}`));
+    tile.type = 'button';
+    add(tile, el('strong', '', int(action.value)));
+    add(tile, el('span', '', action.label));
+
+    tile.addEventListener('click', () => {
+      [...tiles.children].forEach(x => x.classList.remove('active'));
+      tile.classList.add('active');
+      renderActionDetail(detail, action);
+    });
+
+    if (index === 0) {
+      tile.classList.add('active');
+      renderActionDetail(detail, action);
+    }
   });
+
   return card;
+}
+
+function renderActionDetail(target, action) {
+  target.replaceChildren();
+  add(target, el('div', 'micro', action.label));
+  const list = add(target, el('ul', 'store-list'));
+  (action.items || []).slice(0, Number(action.value) || 5).forEach((item, idx) => {
+    const row = add(list, el('li', 'store-row'));
+    add(row, el('div', 'rank', item.rank || idx + 1));
+    const main = add(row, el('div', 'store-main'));
+    add(main, el('div', 'store-name', item.name));
+    add(main, el('div', 'location', item.location || item.reason || ''));
+    if (item.reason) add(main, el('div', 'reason', item.reason));
+    const metrics = add(row, el('div', 'store-metrics'));
+    add(metrics, el('div', 'rating', fmt(item.rating)));
+    add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
+    if (item.review_count) add(metrics, el('div', 'reviews', `${int(item.review_count)} reviews`));
+  });
 }
 
 function redFlags(items = []) {
