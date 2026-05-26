@@ -58,6 +58,25 @@ function kpi(title, value, sub, tint, valueClass = '') {
   return card;
 }
 
+function actionCards(data) {
+  const k = data.kpis || {};
+  const p = data.mobile_priority || {};
+  const card = el('section', 'card action-card');
+  const head = add(card, el('div', 'card-head'));
+  add(head, el('div', 'micro', 'Acción inmediata'));
+  const tiles = add(card, el('div', 'card-body action-grid'));
+  [
+    ['Tiendas críticas', p.critical_count ?? k.critical_stores, ''],
+    ['Deterioro acelerado', p.accelerating_count ?? 0, 'warn-tile'],
+    ['Requieren intervención', p.immediate_action_count ?? 0, '']
+  ].forEach(([label, value, cls]) => {
+    const tile = add(tiles, el('div', `action-tile ${cls}`));
+    add(tile, el('strong', '', int(value)));
+    add(tile, el('span', '', label));
+  });
+  return card;
+}
+
 function redFlags(items = []) {
   const card = el('section', 'card tint-red');
   const head = add(card, el('div', 'card-head'));
@@ -135,6 +154,7 @@ function desktop(data) {
   add(kpis, kpi('Tiendas críticas', int(k.critical_stores), 'Bajo umbral reputacional', 'tint-red', 'risk'));
   add(kpis, kpi('Mayor caída', k.worst_drop?.name || '—', `${fmt(k.worst_drop?.rating)} ${delta(k.worst_drop?.delta)} · ${k.worst_drop?.location || ''}`, 'tint-red', 'small'));
   add(kpis, kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} ${delta(k.best_store?.delta)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
+  add(main, actionCards(data));
   const ctx = add(main, el('div', 'grid context-grid'));
   add(ctx, redFlags(data.red_flags));
   add(ctx, summary(data));
@@ -162,15 +182,7 @@ function mobile(data) {
   add(crit, el('strong', '', int(k.critical_stores)));
   crit.append(' críticas');
   add(hero, el('div', 'hero-headline', p.headline || data.executive_summary?.mobile_hint || ''));
-  const action = add(main, el('section', 'card'));
-  const actionHead = add(action, el('div', 'card-head'));
-  add(actionHead, el('div', 'micro', 'Acción inmediata'));
-  const tiles = add(action, el('div', 'card-body action-grid'));
-  [['Tiendas críticas', p.critical_count ?? k.critical_stores, ''], ['Deterioro acelerado', p.accelerating_count ?? 0, 'warn-tile'], ['Requieren intervención', p.immediate_action_count ?? 0, '']].forEach(([label, value, cls]) => {
-    const tile = add(tiles, el('div', `action-tile ${cls}`));
-    add(tile, el('strong', '', int(value)));
-    add(tile, el('span', '', label));
-  });
+  add(main, actionCards(data));
   add(main, el('div', 'micro risk', '⚠ Red flags'));
   add(main, redFlags(data.red_flags));
   add(main, listCard('Mayores bajas', data.movements?.down, 3));
