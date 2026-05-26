@@ -1,13 +1,13 @@
 const API_BASE = '/api/dashboard';
 const AGENT_URL = '#';
 const app = document.getElementById('app');
-let currentData = null;
 
 const fmt = (v, d = 2) => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
 const int = v => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL') : '—';
 const delta = v => Number.isFinite(Number(v)) ? `${Number(v) > 0 ? '+' : ''}${Number(v).toFixed(2)}` : '—';
 const tone = v => Number(v) > 0 ? 'good' : Number(v) < 0 ? 'risk' : 'neutral';
 const trend = v => Number(v) > 0 ? 'Mejora' : Number(v) < 0 ? 'Deterioro' : 'Estable';
+const arrow = v => Number(v) > 0 ? '↗' : Number(v) < 0 ? '↘' : '→';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -86,25 +86,25 @@ function actionCards(data) {
     tile.addEventListener('click', () => {
       [...tiles.children].forEach(x => x.classList.remove('active'));
       tile.classList.add('active');
-      renderActionDetail(detail, action);
+      renderActionDetail(detail, action, data);
     });
 
     if (index === 0) {
       tile.classList.add('active');
-      renderActionDetail(detail, action);
+      renderActionDetail(detail, action, data);
     }
   });
 
   return card;
 }
 
-function makePrompt(action) {
+function makePrompt(action, data) {
   const names = (action.items || []).slice(0, Number(action.value) || 5).map(x => x.name).filter(Boolean).join(', ');
-  return `Analiza ${action.label.toLowerCase()} del tenant ${currentData?.tenant_id}. Prioriza ${names}. Entrega diagnóstico, evidencia, riesgo y acción recomendada.`;
+  return `Analiza ${action.label.toLowerCase()} del tenant ${data.tenant_id}. Prioriza ${names}. Entrega diagnóstico, evidencia, riesgo y acción recomendada.`;
 }
 
-async function copyPrompt(button, action) {
-  const text = makePrompt(action);
+async function copyPrompt(button, action, data) {
+  const text = makePrompt(action, data);
   try {
     await navigator.clipboard.writeText(text);
     button.textContent = 'Prompt copiado';
@@ -115,13 +115,13 @@ async function copyPrompt(button, action) {
   }
 }
 
-function renderActionDetail(target, action) {
+function renderActionDetail(target, action, data) {
   target.replaceChildren();
   const head = add(target, el('div', 'action-detail-head'));
   add(head, el('div', 'micro', action.label));
   const copy = add(head, el('button', 'copy-btn', 'Copiar prompt agente'));
   copy.type = 'button';
-  copy.addEventListener('click', () => copyPrompt(copy, action));
+  copy.addEventListener('click', () => copyPrompt(copy, action, data));
   const list = add(target, el('ul', 'store-list'));
   (action.items || []).slice(0, Number(action.value) || 5).forEach((item, idx) => {
     const row = add(list, el('li', 'store-row'));
@@ -237,7 +237,7 @@ function mobile(data) {
   const hero = add(main, el('section', 'hero-card'));
   add(hero, el('div', 'micro', 'Nota promedio'));
   add(hero, el('div', 'hero-rating', fmt(k.average_rating)));
-  add(hero, el('div', tone(k.rating_delta), `↘ ${delta(k.rating_delta)}`));
+  add(hero, el('div', tone(k.rating_delta), `${arrow(k.rating_delta)} ${delta(k.rating_delta)}`));
   const crit = add(hero, el('div', 'hero-critical'));
   add(crit, el('strong', '', int(k.critical_stores)));
   crit.append(' críticas');
@@ -256,7 +256,6 @@ function mobile(data) {
 }
 
 function render(data) {
-  currentData = data;
   clear();
   add(app, makeHeader(data));
   add(app, desktop(data));
