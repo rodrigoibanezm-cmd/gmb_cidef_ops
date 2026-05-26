@@ -11,6 +11,7 @@ migraciones
 scripts operacionales
 cron jobs
 admin/debug
+proxy operacional dashboard
 ```
 
 ## Esta repo NO responde preguntas
@@ -18,8 +19,7 @@ admin/debug
 ```txt
 No contiene:
 - agent router
-- render ejecutivo
-- runtime de preguntas
+- runtime conversacional
 - ROM del agente
 ```
 
@@ -27,6 +27,44 @@ Eso vive en:
 
 ```txt
 gmb_cidef
+```
+
+## Dashboard estático
+
+La repo sí contiene:
+
+```txt
+public/dashboard
+```
+
+Pero:
+
+```txt
+no es agente
+no responde preguntas
+no calcula inteligencia
+```
+
+Es únicamente:
+
+```txt
+visor operacional estático
+```
+
+Arquitectura:
+
+```txt
+Dashboard estático
+→ /api/dashboard
+→ tablas materializadas Neon
+→ render
+```
+
+Regla:
+
+```txt
+/api/dashboard no calcula inteligencia.
+Solo valida tenant, consulta tablas materializadas en Neon y devuelve JSON plano.
 ```
 
 ## Infraestructura
@@ -44,6 +82,12 @@ El agente consulta.
 Ops mantiene los datos.
 Neon es el único plano operacional.
 Redis/Upstash no forma parte de la arquitectura.
+```
+
+Principio central:
+
+```txt
+la carga calcula, el runtime lee
 ```
 
 ## Endpoints operativos actuales
@@ -77,6 +121,28 @@ place_snapshots en Neon
 place_daily_metrics en Neon
 place_reviews en Neon
 runtime listo
+```
+
+### Dashboard runtime
+
+```txt
+GET /api/dashboard
+```
+
+Hace:
+
+```txt
+validación tenant
+lectura Neon
+respuesta JSON plana
+```
+
+No hace:
+
+```txt
+rankings runtime
+cálculo operacional runtime
+inteligencia semántica runtime
 ```
 
 ## Endpoints eliminados
@@ -137,4 +203,7 @@ captura desacoplada del agente
 operación diaria en endpoint simple
 Neon como único plano de datos
 sin Redis/Upstash
+frontend estático
+proxy liviano
+sin backend inteligente runtime
 ```
