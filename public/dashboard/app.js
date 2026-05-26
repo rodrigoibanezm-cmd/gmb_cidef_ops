@@ -8,6 +8,7 @@ const delta = v => Number.isFinite(Number(v)) ? `${Number(v) > 0 ? '+' : ''}${Nu
 const tone = v => Number(v) > 0 ? 'good' : Number(v) < 0 ? 'risk' : 'neutral';
 const trend = v => Number(v) > 0 ? 'Mejora' : Number(v) < 0 ? 'Deterioro' : 'Estable';
 const arrow = v => Number(v) > 0 ? '↗' : Number(v) < 0 ? '↘' : '→';
+const hasItems = items => Array.isArray(items) && items.length > 0;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -219,8 +220,8 @@ function desktop(data) {
   add(ctx, redFlags(data.red_flags));
   add(ctx, summary(data));
   const ops = add(main, el('div', 'grid operational-grid'));
-  add(ops, listCard('Mayores alzas', data.movements?.up, 5, 'tint-green'));
-  add(ops, listCard('Mayores bajas', data.movements?.down, 5, 'tint-red'));
+  if (hasItems(data.movements?.up)) add(ops, listCard('Mayores alzas', data.movements.up, 5, 'tint-green'));
+  if (hasItems(data.movements?.down)) add(ops, listCard('Mayores bajas', data.movements.down, 5, 'tint-red'));
   add(ops, listCard('Top 5', data.rankings?.top));
   add(ops, listCard('Bottom 5', data.rankings?.bottom));
   const footer = add(main, el('footer', 'footer'));
@@ -245,9 +246,9 @@ function mobile(data) {
   add(main, actionCards(data));
   add(main, el('div', 'micro risk', '⚠ Red flags'));
   add(main, redFlags(data.red_flags));
-  add(main, listCard('Mayores bajas', data.movements?.down, 3));
+  if (hasItems(data.movements?.down)) add(main, listCard('Mayores bajas', data.movements.down, 3));
   add(main, summary(data, true));
-  add(main, listCard('Mayores alzas', data.movements?.up, 3));
+  if (hasItems(data.movements?.up)) add(main, listCard('Mayores alzas', data.movements.up, 3));
   add(main, listCard('Top 5', data.rankings?.top, 5));
   add(main, listCard('Bottom 5', data.rankings?.bottom, 5));
   const btn = add(wrap, el('a', 'mobile-agent', 'Abrir agente ↗'));
