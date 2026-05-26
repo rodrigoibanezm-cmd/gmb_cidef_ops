@@ -1,4 +1,4 @@
-import { ALLOWED_TENANTS, getMockDashboard } from '../lib/dashboard/mockDashboard.js';
+import { ALLOWED_TENANTS, getDashboardFromNeon } from '../lib/dashboard/neonDashboard.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -44,10 +44,27 @@ export default async function handler(req, res) {
     });
   }
 
-  const payload = getMockDashboard(tenant_id);
+  try {
+    const payload = await getDashboardFromNeon(tenant_id, view);
 
-  return res.status(200).json({
-    ...payload,
-    view
-  });
+    if (!payload) {
+      return res.status(404).json({
+        ok: false,
+        error: 'dashboard_snapshot_not_found',
+        tenant_id,
+        view
+      });
+    }
+
+    return res.status(200).json({
+      ...payload,
+      view
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: 'dashboard_runtime_error',
+      message: error.message
+    });
+  }
 }
