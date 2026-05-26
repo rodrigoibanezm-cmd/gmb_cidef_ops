@@ -8,7 +8,7 @@ Este documento reemplaza la aproximación inicial basada en Lovable como runtime
 
 Lovable se utilizó únicamente como prototipado visual.
 
-El runtime final es estático, simple y conectado al backend operativo.
+El runtime final es estático, simple y conectado a una foto operacional materializada en Neon.
 
 ---
 
@@ -81,7 +81,7 @@ El frontend:
 - renderiza;
 - prioriza visualmente;
 - adapta desktop/mobile;
-- consume backend;
+- consume `/api/dashboard` como proxy liviano;
 - no calcula inteligencia.
 
 No debe:
@@ -94,9 +94,33 @@ No debe:
 
 ---
 
+# Arquitectura de datos
+
+Flujo oficial:
+
+```txt
+Dashboard estático
+→ /api/dashboard
+→ tablas materializadas Neon
+→ render
+```
+
+Regla precisa:
+
+```txt
+/api/dashboard no calcula inteligencia.
+Solo valida tenant, consulta tablas materializadas en Neon y devuelve JSON plano.
+```
+
+El dashboard no consume cálculo runtime.
+
+Consume una foto operacional ya materializada en Neon, expuesta por `/api/dashboard` como proxy liviano.
+
+---
+
 # Backend
 
-Fuente única:
+Transporte único:
 
 ```txt
 /api/dashboard
@@ -108,7 +132,7 @@ Ejemplo:
 /api/dashboard?tenant_id=sodimac&view=full
 ```
 
-El frontend consume:
+`/api/dashboard` entrega:
 
 - KPIs;
 - red_flags;
@@ -117,7 +141,31 @@ El frontend consume:
 - executive_summary;
 - mobile_priority.
 
-Toda inteligencia operacional viene preparada desde backend/Neon.
+Pero no los calcula.
+
+La inteligencia operacional ya viene materializada desde la carga en Neon.
+
+Principio:
+
+```txt
+la carga calcula, el runtime lee
+```
+
+---
+
+# Contrato conceptual
+
+```txt
+Neon = memoria operacional
+materialización = inteligencia operacional
+/api/dashboard = transporte
+frontend = render
+agente = interpretación
+```
+
+El contrato real no es el cálculo runtime del backend.
+
+El contrato real son las tablas/vistas materializadas en Neon.
 
 ---
 
@@ -127,7 +175,7 @@ No son versiones responsive del mismo dashboard.
 
 Son:
 
-- mismo backend;
+- mismo transporte;
 - misma foto operacional;
 - distinta interfaz cognitiva.
 
@@ -391,7 +439,7 @@ Ventajas:
 
 Responsabilidades:
 
-- fetch;
+- fetch a `/api/dashboard`;
 - render desktop;
 - render mobile;
 - render KPIs;
@@ -440,7 +488,9 @@ El frontend siempre debe leer la foto operacional preparada.
 
 No debe reconstruirla.
 
-La fuente operacional oficial es Neon vía backend.
+La fuente operacional oficial es Neon.
+
+`/api/dashboard` es solo transporte seguro entre el navegador y Neon.
 
 ---
 
