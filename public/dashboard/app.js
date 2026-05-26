@@ -1,6 +1,7 @@
 const API_BASE = '/api/dashboard';
 const AGENT_URL = '#';
 const app = document.getElementById('app');
+let currentData = null;
 
 const fmt = (v, d = 2) => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
 const int = v => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL') : '—';
@@ -97,9 +98,30 @@ function actionCards(data) {
   return card;
 }
 
+function makePrompt(action) {
+  const names = (action.items || []).slice(0, Number(action.value) || 5).map(x => x.name).filter(Boolean).join(', ');
+  return `Analiza ${action.label.toLowerCase()} del tenant ${currentData?.tenant_id}. Prioriza ${names}. Entrega diagnóstico, evidencia, riesgo y acción recomendada.`;
+}
+
+async function copyPrompt(button, action) {
+  const text = makePrompt(action);
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = 'Prompt copiado';
+    setTimeout(() => { button.textContent = 'Copiar prompt agente'; }, 1400);
+  } catch (e) {
+    button.textContent = 'No se pudo copiar';
+    setTimeout(() => { button.textContent = 'Copiar prompt agente'; }, 1400);
+  }
+}
+
 function renderActionDetail(target, action) {
   target.replaceChildren();
-  add(target, el('div', 'micro', action.label));
+  const head = add(target, el('div', 'action-detail-head'));
+  add(head, el('div', 'micro', action.label));
+  const copy = add(head, el('button', 'copy-btn', 'Copiar prompt agente'));
+  copy.type = 'button';
+  copy.addEventListener('click', () => copyPrompt(copy, action));
   const list = add(target, el('ul', 'store-list'));
   (action.items || []).slice(0, Number(action.value) || 5).forEach((item, idx) => {
     const row = add(list, el('li', 'store-row'));
@@ -234,6 +256,7 @@ function mobile(data) {
 }
 
 function render(data) {
+  currentData = data;
   clear();
   add(app, makeHeader(data));
   add(app, desktop(data));
