@@ -1,4 +1,9 @@
-import { ALLOWED_TENANTS, getDashboardFromNeon } from '../lib/dashboard/neonDashboard.js';
+import {
+  ALLOWED_TENANTS,
+  ALLOWED_VIEWS,
+  getDashboardFromNeon,
+  getOperationalDashboardFromNeon
+} from '../lib/dashboard/neonDashboard.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,17 +39,21 @@ export default async function handler(req, res) {
     });
   }
 
-  const allowedViews = ['full'];
-
-  if (!allowedViews.includes(view)) {
+  if (!ALLOWED_VIEWS.includes(view)) {
     return res.status(400).json({
       ok: false,
       error: 'invalid_view',
-      allowed_views: allowedViews
+      allowed_views: ALLOWED_VIEWS
     });
   }
 
   try {
+    if (view === 'operational') {
+      const payload = await getOperationalDashboardFromNeon(tenant_id);
+
+      return res.status(200).json(payload);
+    }
+
     const payload = await getDashboardFromNeon(tenant_id, view);
 
     if (!payload) {
