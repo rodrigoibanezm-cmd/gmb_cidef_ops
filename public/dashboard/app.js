@@ -4,6 +4,7 @@ const app = document.getElementById('app');
 
 const fmt = (v, d = 2) => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
 const int = v => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL') : '—';
+const signedInt = v => Number.isFinite(Number(v)) ? `${Number(v) > 0 ? '+' : ''}${Number(v).toLocaleString('es-CL', { maximumFractionDigits: 0 })}` : '—';
 const delta = v => Number.isFinite(Number(v)) ? `${Number(v) > 0 ? '+' : ''}${Number(v).toFixed(2)}` : '—';
 const tone = v => Number(v) > 0 ? 'good' : Number(v) < 0 ? 'risk' : 'neutral';
 const trend = v => Number(v) > 0 ? 'Mejora' : Number(v) < 0 ? 'Deterioro' : 'Estable';
@@ -217,9 +218,9 @@ function desktop(data) {
   const main = add(wrap, el('div', 'container main'));
   const k = data.kpis;
   const kpis = add(main, el('div', 'grid kpi-grid'));
-  add(kpis, kpi('Nota promedio', fmt(k.average_rating), `${delta(k.rating_delta)} vs. período`, 'tint-blue'));
+  add(kpis, kpi('Nota promedio', fmt(k.average_rating), `${delta(k.rating_delta)} vs. ayer`, 'tint-blue'));
   add(kpis, kpi('Tendencia', trend(k.rating_delta), `${delta(k.rating_delta)} pts`, Number(k.rating_delta) < 0 ? 'tint-red' : 'tint-green', tone(k.rating_delta)));
-  add(kpis, kpi('Reviews', int(k.total_reviews), `+${int(k.reviews_delta)} nuevas`, 'tint-violet'));
+  add(kpis, kpi('Reviews', int(k.total_reviews), `${signedInt(k.reviews_delta)} vs. ayer`, 'tint-violet'));
   add(kpis, kpi('Pierden su zona', int(data.competitive_summary?.risk_count), 'Riesgo competitivo local', 'tint-red', 'risk'));
   add(kpis, kpi('Bajo umbral', int(k.critical_stores), 'Rating menor a 4.0', 'tint-red', 'risk'));
   add(kpis, kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
@@ -248,6 +249,9 @@ function mobile(data) {
   const hero = add(main, el('section', 'hero-card'));
   add(hero, el('div', 'micro', 'Nota promedio'));
   add(hero, el('div', 'hero-rating', fmt(k.average_rating)));
+  const since = add(hero, el('div', 'hero-since'));
+  add(since, el('span', '', `Reviews ${signedInt(k.reviews_delta)} vs. ayer`));
+  add(since, el('span', '', `Rating ${delta(k.rating_delta)} pts`));
   const crit = add(hero, el('div', 'hero-critical'));
   add(crit, el('strong', '', int(data.competitive_summary?.risk_count)));
   crit.append(' zonas con riesgo');
