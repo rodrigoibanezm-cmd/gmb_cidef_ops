@@ -1,3 +1,4 @@
+import { rebuildDashboardSnapshot } from "../../../lib/dashboard/materialize.js";
 import { dbQuery } from "../../../lib/gmb/postgres.js";
 
 const FIELD_MASK = [
@@ -257,11 +258,21 @@ export default async function handler(req, res) {
 
     const remainingUnattempted = pending.length;
     const done = remainingUnattempted === 0;
-    const status = failed > 0 ? "partial" : "done";
+    const status = !done ? "incomplete" : failed > 0 ? "partial" : "done";
     await finishRun({ runId, status, totalPlaces: places.length, processed, saved, failed, errors: allErrors });
 
+    let dashboardSnapshot = null;
+    let dashboardError = null;
+
+    try {
+      dashboardSnapshot = await rebuildDashboardSnapshot({ tenantId, date });
+    } catch (error) {
+      dashboardError = { message: error.message, code: error.code || null };
+    }
+
     return res.status(200).json({
-      ok: done,
+      ok: done && failed === 0 && !dashboardError,
+      status,
       tenant_id: tenantId,
       date,
       run_id: runId,
@@ -273,8 +284,11 @@ export default async function handler(req, res) {
       remaining_unattempted: remainingUnattempted,
       done,
       runtime_ready: saved > 0 || existingSet.size > 0,
+      dashboard_rebuilt: Boolean(dashboardSnapshot),
+      dashboard_snapshot: dashboardSnapshot,
+      dashboard_error: dashboardError,
       batches,
-      flow: "Google Places light -> Neon place_snapshots + place_daily_metrics",
+      flow: "Google Places light -> Neon place_snapshots + place_daily_metrics -> dashboard_snapshots",
     });
   } catch (error) {
     if (runId) {
