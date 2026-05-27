@@ -22,6 +22,20 @@ function dateText(value) {
   });
 }
 
+function shortDateText(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value || '';
+  return d.toLocaleDateString('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function alertDate(alert) {
+  return alert.review_date || alert.published_at || alert.publish_time || alert.publishTime || alert.created_at || alert.captured_at || alert.date || alert.captured_date;
+}
+
 function factsMap(facts = []) {
   const out = {};
   for (const raw of facts) {
@@ -227,6 +241,8 @@ function qualitativeAlerts(data) {
     const head = add(row, el('div', 'qual-head'));
     add(head, el('span', `severity ${alert.severity === 'critical' ? 'high' : 'medium'}`, severityLabel(alert.severity)));
     add(head, el('strong', '', alert.safe_label || 'Alerta cualitativa'));
+    const date = shortDateText(alertDate(alert));
+    if (date) add(head, el('span', 'alert-date', date));
     add(row, el('div', 'store-name', alert.store_name || 'Tienda sin nombre'));
     add(row, el('div', 'location', alert.location || ''));
     add(row, el('p', 'reason', alert.summary || ''));
