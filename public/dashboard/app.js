@@ -1,5 +1,11 @@
 const API_BASE = '/api/dashboard';
-const AGENT_URL = '#';
+const AGENT_URLS = {
+  beauty_plus: 'https://chatgpt.com/g/g-69f80b7e57708191a5141be066b0bd0c-agente-analisis-reputacion'
+};
+
+function agentUrl(data) {
+  return AGENT_URLS[data.tenant_id] || '#';
+}
 const app = document.getElementById('app');
 
 const fmt = (v, d = 2) => Number.isFinite(Number(v)) ? Number(v).toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
