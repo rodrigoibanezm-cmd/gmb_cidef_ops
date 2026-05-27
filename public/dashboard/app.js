@@ -55,7 +55,7 @@ function makeHeader(data) {
   pill.append(' Datos operacionales actualizados');
   add(meta, el('span', 'updated', dateText(data.updated_at)));
   const btn = add(inner, el('a', 'agent-btn', 'Abrir agente →'));
-  btn.href = AGENT_URL;
+  btn.href = agentUrl(data);
   return header;
 }
 
@@ -273,7 +273,7 @@ function mobile(data) {
   add(main, listCard('Top 5', data.rankings?.top, 5));
   add(main, listCard('Bottom 5', data.rankings?.bottom, 5));
   const btn = add(wrap, el('a', 'mobile-agent', 'Abrir agente ↗'));
-  btn.href = AGENT_URL;
+  btn.href = agentUrl(data);
   return wrap;
 }
 
