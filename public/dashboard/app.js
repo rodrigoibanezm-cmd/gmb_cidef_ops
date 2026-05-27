@@ -1,16 +1,5 @@
 const app = document.getElementById('app');
-const {
-  add,
-  el,
-  makeHeader,
-  kpi,
-  actionCards,
-  competitiveRisk,
-  redFlags,
-  summary,
-  listCard,
-  qualitativeAlerts
-} = window.DashboardComponents;
+const UI = window.DashboardComponents;
 
 function clear() {
   app.replaceChildren();
@@ -18,82 +7,82 @@ function clear() {
 
 function state(message) {
   clear();
-  add(app, el('div', 'state state-page', message));
+  UI.add(app, UI.el('div', 'state state-page', message));
 }
 
 function desktop(data) {
-  const wrap = el('div', 'desktop-only');
-  const main = add(wrap, el('div', 'container main'));
+  const wrap = UI.el('div', 'desktop-only');
+  const main = UI.add(wrap, UI.el('div', 'container main'));
   const k = data.kpis;
 
-  const kpis = add(main, el('div', 'grid kpi-grid'));
-  add(kpis, kpi('Nota promedio', fmt(k.average_rating), `${delta(k.rating_delta)} vs. ayer`, 'tint-blue'));
-  add(kpis, kpi('Tendencia', trend(k.rating_delta), `${delta(k.rating_delta)} pts`, Number(k.rating_delta) < 0 ? 'tint-red' : 'tint-green', tone(k.rating_delta)));
-  add(kpis, kpi('Reviews', int(k.total_reviews), `${signedInt(k.reviews_delta)} vs. ayer`, 'tint-violet'));
-  add(kpis, kpi('Pierden su zona', int(data.competitive_summary?.risk_count), 'Riesgo competitivo local', 'tint-red', 'risk'));
-  add(kpis, kpi('Bajo umbral', int(k.critical_stores), 'Rating menor a 4.0', 'tint-red', 'risk'));
-  add(kpis, kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
+  const kpis = UI.add(main, UI.el('div', 'grid kpi-grid'));
+  UI.add(kpis, UI.kpi('Nota promedio', fmt(k.average_rating), `${delta(k.rating_delta)} vs. ayer`, 'tint-blue'));
+  UI.add(kpis, UI.kpi('Tendencia', trend(k.rating_delta), `${delta(k.rating_delta)} pts`, Number(k.rating_delta) < 0 ? 'tint-red' : 'tint-green', tone(k.rating_delta)));
+  UI.add(kpis, UI.kpi('Reviews', int(k.total_reviews), `${signedInt(k.reviews_delta)} vs. ayer`, 'tint-violet'));
+  UI.add(kpis, UI.kpi('Pierden su zona', int(data.competitive_summary?.risk_count), 'Riesgo competitivo local', 'tint-red', 'risk'));
+  UI.add(kpis, UI.kpi('Bajo umbral', int(k.critical_stores), 'Rating menor a 4.0', 'tint-red', 'risk'));
+  UI.add(kpis, UI.kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
 
-  const alerts = qualitativeAlerts(data);
-  if (alerts) add(main, alerts);
+  const alerts = UI.qualitativeAlerts(data);
+  if (alerts) UI.add(main, alerts);
 
-  const comp = competitiveRisk(data);
-  if (comp) add(main, comp);
+  const comp = UI.competitiveRisk(data);
+  if (comp) UI.add(main, comp);
 
-  add(main, actionCards(data));
+  UI.add(main, UI.actionCards(data));
 
-  const ctx = add(main, el('div', 'grid context-grid'));
-  add(ctx, redFlags(data.red_flags));
-  add(ctx, summary(data));
+  const ctx = UI.add(main, UI.el('div', 'grid context-grid'));
+  UI.add(ctx, UI.redFlags(data.red_flags));
+  UI.add(ctx, UI.summary(data));
 
-  const ops = add(main, el('div', 'grid operational-grid'));
-  if (hasItems(data.movements?.up)) add(ops, listCard('Mayores alzas', data.movements.up, 5, 'tint-green'));
-  if (hasItems(data.movements?.down)) add(ops, listCard('Mayores bajas', data.movements.down, 5, 'tint-red'));
-  add(ops, listCard('Top 5', data.rankings?.top));
-  add(ops, listCard('Bottom 5', data.rankings?.bottom));
+  const ops = UI.add(main, UI.el('div', 'grid operational-grid'));
+  if (hasItems(data.movements?.up)) UI.add(ops, UI.listCard('Mayores alzas', data.movements.up, 5, 'tint-green'));
+  if (hasItems(data.movements?.down)) UI.add(ops, UI.listCard('Mayores bajas', data.movements.down, 5, 'tint-red'));
+  UI.add(ops, UI.listCard('Top 5', data.rankings?.top));
+  UI.add(ops, UI.listCard('Bottom 5', data.rankings?.bottom));
 
-  const footer = add(main, el('footer', 'footer'));
-  add(footer, el('span', '', 'Fuente: Google Places / Neon'));
-  add(footer, el('span', '', data.source || 'runtime'));
+  const footer = UI.add(main, UI.el('footer', 'footer'));
+  UI.add(footer, UI.el('span', '', 'Fuente: Google Places / Neon'));
+  UI.add(footer, UI.el('span', '', data.source || 'runtime'));
 
   return wrap;
 }
 
 function mobile(data) {
-  const wrap = el('div', 'mobile-only');
-  const main = add(wrap, el('div', 'container main mobile-stack'));
+  const wrap = UI.el('div', 'mobile-only');
+  const main = UI.add(wrap, UI.el('div', 'container main mobile-stack'));
   const k = data.kpis;
   const p = data.mobile_priority || {};
 
-  const hero = add(main, el('section', 'hero-card'));
-  add(hero, el('div', 'micro', 'Nota promedio'));
-  add(hero, el('div', 'hero-rating', fmt(k.average_rating)));
+  const hero = UI.add(main, UI.el('section', 'hero-card'));
+  UI.add(hero, UI.el('div', 'micro', 'Nota promedio'));
+  UI.add(hero, UI.el('div', 'hero-rating', fmt(k.average_rating)));
 
-  const since = add(hero, el('div', 'hero-since'));
-  add(since, el('span', '', `Reviews ${signedInt(k.reviews_delta)} vs. ayer`));
-  add(since, el('span', '', `Rating ${delta(k.rating_delta)} pts`));
+  const since = UI.add(hero, UI.el('div', 'hero-since'));
+  UI.add(since, UI.el('span', '', `Reviews ${signedInt(k.reviews_delta)} vs. ayer`));
+  UI.add(since, UI.el('span', '', `Rating ${delta(k.rating_delta)} pts`));
 
-  const crit = add(hero, el('div', 'hero-critical'));
-  add(crit, el('strong', '', int(data.competitive_summary?.risk_count)));
+  const crit = UI.add(hero, UI.el('div', 'hero-critical'));
+  UI.add(crit, UI.el('strong', '', int(data.competitive_summary?.risk_count)));
   crit.append(' zonas con riesgo');
-  add(hero, el('div', 'hero-headline', data.competitive_summary?.headline || p.headline || data.executive_summary?.mobile_hint || ''));
+  UI.add(hero, UI.el('div', 'hero-headline', data.competitive_summary?.headline || p.headline || data.executive_summary?.mobile_hint || ''));
 
-  const alerts = qualitativeAlerts(data);
-  if (alerts) add(main, alerts);
+  const alerts = UI.qualitativeAlerts(data);
+  if (alerts) UI.add(main, alerts);
 
-  const comp = competitiveRisk(data);
-  if (comp) add(main, comp);
+  const comp = UI.competitiveRisk(data);
+  if (comp) UI.add(main, comp);
 
-  add(main, actionCards(data));
-  add(main, el('div', 'micro risk', '⚠ Tiendas bajo umbral'));
-  add(main, redFlags(data.red_flags));
-  if (hasItems(data.movements?.down)) add(main, listCard('Mayores bajas', data.movements.down, 3));
-  add(main, summary(data, true));
-  if (hasItems(data.movements?.up)) add(main, listCard('Mayores alzas', data.movements.up, 3));
-  add(main, listCard('Top 5', data.rankings?.top, 5));
-  add(main, listCard('Bottom 5', data.rankings?.bottom, 5));
+  UI.add(main, UI.actionCards(data));
+  UI.add(main, UI.el('div', 'micro risk', '⚠ Tiendas bajo umbral'));
+  UI.add(main, UI.redFlags(data.red_flags));
+  if (hasItems(data.movements?.down)) UI.add(main, UI.listCard('Mayores bajas', data.movements.down, 3));
+  UI.add(main, UI.summary(data, true));
+  if (hasItems(data.movements?.up)) UI.add(main, UI.listCard('Mayores alzas', data.movements.up, 3));
+  UI.add(main, UI.listCard('Top 5', data.rankings?.top, 5));
+  UI.add(main, UI.listCard('Bottom 5', data.rankings?.bottom, 5));
 
-  const btn = add(wrap, el('a', 'mobile-agent', 'Abrir agente ↗'));
+  const btn = UI.add(wrap, UI.el('a', 'mobile-agent', 'Abrir agente ↗'));
   btn.href = agentUrl(data);
 
   return wrap;
@@ -101,9 +90,9 @@ function mobile(data) {
 
 function render(data) {
   clear();
-  add(app, makeHeader(data));
-  add(app, desktop(data));
-  add(app, mobile(data));
+  UI.add(app, UI.makeHeader(data));
+  UI.add(app, desktop(data));
+  UI.add(app, mobile(data));
 }
 
 async function init() {
