@@ -33,7 +33,7 @@ function shortDateText(value) {
 }
 
 function alertDate(alert) {
-  return alert.review_date || alert.published_at || alert.publish_time || alert.publishTime || alert.created_at || alert.captured_at || alert.date || alert.captured_date;
+  return alert.alert_date || alert.classified_at || alert.review_date || alert.published_at || alert.publish_time || alert.publishTime || alert.created_at || alert.captured_at || alert.date || alert.captured_date;
 }
 
 function factsMap(facts = []) {
@@ -236,7 +236,7 @@ function qualitativeAlerts(data) {
   const { card, body } = accordionCard('Alertas cualitativas', { tint: 'tint-red', meta, open: true });
 
   const list = add(body, el('ul', 'qual-list'));
-  alerts.slice(0, 5).forEach(alert => {
+  alerts.forEach(alert => {
     const row = add(list, el('li', 'qual-row'));
     const head = add(row, el('div', 'qual-head'));
     add(head, el('span', `severity ${alert.severity === 'critical' ? 'high' : 'medium'}`, severityLabel(alert.severity)));
