@@ -50,6 +50,58 @@ ORDER BY snapshot_date DESC
 LIMIT 1;
 ```
 
+## Contrato de escritura
+
+La materialización escribe una foto por:
+
+```txt
+tenant_id + snapshot_date + view
+```
+
+Si se materializa el mismo tenant, fecha y view, se reemplaza esa foto diaria.
+
+Si se materializa otra fecha, queda una nueva fila histórica.
+
+## Regla anti-snapshot incompleto
+
+No se materializa dashboard si la captura del día está incompleta.
+
+Validación previa:
+
+```txt
+captured_places >= total places keep del tenant
+```
+
+Fuente de conteo:
+
+```txt
+total_places = places donde tenant_id = X y status keep
+captured_places = place_daily_metrics distintos para tenant_id = X y captured_date = snapshot_date
+```
+
+Si falta carga, `rebuildDashboardSnapshot` falla con:
+
+```txt
+error.code = capture_incomplete
+```
+
+Esto protege:
+
+```txt
+/api/gmb/update/light-neon
+/api/gmb/update/full-neon
+/api/dashboard/rebuild
+```
+
+Resultado esperado en cargas chicas o parciales:
+
+```txt
+status = incomplete
+dashboard_rebuilt = false
+dashboard_snapshot = null
+dashboard_error.code = capture_incomplete
+```
+
 ## Payload requerido
 
 ```txt
@@ -164,11 +216,26 @@ beauty_plus OK
 cidef       OK con regla especial por operator y threshold >= 20 reviews
 ```
 
+## Estado operativo
+
+```txt
+light-neon  actualiza dashboard_snapshots solo si captura completa
+full-neon   actualiza dashboard_snapshots solo si captura completa
+rebuild     protegido contra capturas incompletas
+```
+
+Smoke validado:
+
+```txt
+light-neon parcial → dashboard_rebuilt=false / capture_incomplete
+full-neon parcial  → dashboard_rebuilt=false / capture_incomplete
+```
+
 ## Deudas pendientes
 
 ```txt
 temporal / delta real
 confidence visible en frontend
-SQL parametrizado como job operativo
-materialización automática post-carga
+SQL/job parametrizado como operación estable
+pending_actions generado por agente auditor
 ```
