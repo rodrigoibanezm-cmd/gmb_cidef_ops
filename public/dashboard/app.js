@@ -246,11 +246,11 @@ function mobile(data) {
   const k = data.kpis;
   const p = data.mobile_priority || {};
   const hero = add(main, el('section', 'hero-card'));
-  add(hero, el('div', 'micro', 'Riesgo competitivo local'));
-  add(hero, el('div', 'hero-rating', int(data.competitive_summary?.risk_count)));
+  add(hero, el('div', 'micro', 'Nota promedio'));
+  add(hero, el('div', 'hero-rating', fmt(k.average_rating)));
   const crit = add(hero, el('div', 'hero-critical'));
-  add(crit, el('strong', '', int(k.critical_stores)));
-  crit.append(' bajo umbral');
+  add(crit, el('strong', '', int(data.competitive_summary?.risk_count)));
+  crit.append(' zonas con riesgo');
   add(hero, el('div', 'hero-headline', data.competitive_summary?.headline || p.headline || data.executive_summary?.mobile_hint || ''));
   const comp = competitiveRisk(data);
   if (comp) add(main, comp);
