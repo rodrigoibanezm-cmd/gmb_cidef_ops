@@ -219,7 +219,7 @@ function qualitativeAlerts(data) {
   if (!hasItems(alerts)) return null;
 
   const meta = `${int(q.critical_count || 0)} críticas · ${int(q.high_count || 0)} altas`;
-  const { card, body } = accordionCard('Alertas cualitativas', { tint: 'tint-red', meta });
+  const { card, body } = accordionCard('Alertas cualitativas', { tint: 'tint-red', meta, open: true });
 
   const list = add(body, el('ul', 'qual-list'));
   alerts.slice(0, 5).forEach(alert => {
