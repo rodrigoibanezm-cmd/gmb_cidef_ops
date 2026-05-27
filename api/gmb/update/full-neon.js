@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { rebuildDashboardSnapshot } from "../../../lib/dashboard/materialize.js";
 import { dbQuery } from "../../../lib/gmb/postgres.js";
 
 const FIELD_MASK = [
@@ -349,8 +350,17 @@ export default async function handler(req, res) {
     const status = !done ? "incomplete" : failed > 0 ? "partial" : "done";
     await finishRun({ runId, status, totalPlaces: places.length, processed, saved, failed, reviewsSaved, errors: allErrors });
 
+    let dashboardSnapshot = null;
+    let dashboardError = null;
+
+    try {
+      dashboardSnapshot = await rebuildDashboardSnapshot({ tenantId, date });
+    } catch (error) {
+      dashboardError = { message: error.message, code: error.code || null };
+    }
+
     return res.status(200).json({
-      ok: done && failed === 0,
+      ok: done && failed === 0 && !dashboardError,
       status,
       tenant_id: tenantId,
       date,
@@ -365,8 +375,11 @@ export default async function handler(req, res) {
       done,
       runtime_ready: saved > 0 || existingSet.size > 0,
       evidence_ready: reviewsSaved > 0,
+      dashboard_rebuilt: Boolean(dashboardSnapshot),
+      dashboard_snapshot: dashboardSnapshot,
+      dashboard_error: dashboardError,
       batches,
-      flow: "Google Places full -> Neon place_snapshots + place_daily_metrics + place_reviews",
+      flow: "Google Places full -> Neon place_snapshots + place_daily_metrics + place_reviews -> dashboard_snapshots",
     });
   } catch (error) {
     if (runId) {
