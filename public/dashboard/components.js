@@ -111,7 +111,7 @@ function renderActionDetail(target, action, data) {
 }
 
 function actionCards(data) {
-  const { card, body } = accordionCard('Acción inmediata', { open: true });
+  const { card, body } = accordionCard('Acción inmediata');
   const tiles = add(body, el('div', 'action-grid'));
   const detail = add(body, el('div', 'action-detail'));
 
@@ -152,7 +152,7 @@ function addStoreRow(list, item, idx) {
 function competitiveRisk(data) {
   if (!hasItems(data.local_competitive_risk)) return null;
   const meta = `${int(data.competitive_summary?.risk_count)} zonas`;
-  const { card, body } = accordionCard('Riesgo competitivo local', { tint: 'tint-red', meta, open: true });
+  const { card, body } = accordionCard('Riesgo competitivo local', { tint: 'tint-red', meta });
   add(body, el('p', 'summary-text', data.competitive_summary?.headline || 'Hay zonas donde la red propia pierde liderazgo local.'));
   const list = add(body, el('ul', 'store-list'));
   data.local_competitive_risk.slice(0, 5).forEach((item, idx) => addStoreRow(list, item, idx));
@@ -182,7 +182,7 @@ function redFlags(items = []) {
 
 function summary(data, mobile = false) {
   const facts = factsMap(data.executive_summary?.facts);
-  const { card, body } = accordionCard('Resumen ejecutivo', { open: !mobile });
+  const { card, body } = accordionCard('Resumen ejecutivo');
   add(body, el('p', 'summary-text', mobile ? data.executive_summary?.mobile_hint : data.executive_summary?.desktop_hint));
   const list = add(body, el('ul', 'facts-list'));
   const rows = [
@@ -219,11 +219,7 @@ function qualitativeAlerts(data) {
   if (!hasItems(alerts)) return null;
 
   const meta = `${int(q.critical_count || 0)} críticas · ${int(q.high_count || 0)} altas`;
-  const { card, body } = accordionCard('Alertas cualitativas', {
-    tint: 'tint-red',
-    meta,
-    open: (q.critical_count || 0) > 0
-  });
+  const { card, body } = accordionCard('Alertas cualitativas', { tint: 'tint-red', meta });
 
   const list = add(body, el('ul', 'qual-list'));
   alerts.slice(0, 5).forEach(alert => {
