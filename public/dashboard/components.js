@@ -31,6 +31,18 @@ function factsMap(facts = []) {
   return out;
 }
 
+function accordionCard(title, opts = {}) {
+  const card = el('details', `card accordion-card ${opts.tint || ''}`);
+  if (opts.open) card.open = true;
+
+  const summaryNode = add(card, el('summary', 'accordion-summary'));
+  const titleNode = add(summaryNode, el('span', 'micro', title));
+  if (opts.meta) titleNode.append(` · ${opts.meta}`);
+
+  const body = add(card, el('div', 'card-body'));
+  return { card, body };
+}
+
 function makeHeader(data) {
   const header = el('header', 'header');
   const inner = add(header, el('div', 'header-inner'));
@@ -99,10 +111,7 @@ function renderActionDetail(target, action, data) {
 }
 
 function actionCards(data) {
-  const card = el('section', 'card action-card');
-  const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', 'Acción inmediata'));
-  const body = add(card, el('div', 'card-body'));
+  const { card, body } = accordionCard('Acción inmediata', { open: true });
   const tiles = add(body, el('div', 'action-grid'));
   const detail = add(body, el('div', 'action-detail'));
 
@@ -142,10 +151,8 @@ function addStoreRow(list, item, idx) {
 
 function competitiveRisk(data) {
   if (!hasItems(data.local_competitive_risk)) return null;
-  const card = el('section', 'card competitive-card tint-red');
-  const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', 'Riesgo competitivo local'));
-  const body = add(card, el('div', 'card-body'));
+  const meta = `${int(data.competitive_summary?.risk_count)} zonas`;
+  const { card, body } = accordionCard('Riesgo competitivo local', { tint: 'tint-red', meta, open: true });
   add(body, el('p', 'summary-text', data.competitive_summary?.headline || 'Hay zonas donde la red propia pierde liderazgo local.'));
   const list = add(body, el('ul', 'store-list'));
   data.local_competitive_risk.slice(0, 5).forEach((item, idx) => addStoreRow(list, item, idx));
@@ -153,11 +160,7 @@ function competitiveRisk(data) {
 }
 
 function redFlags(items = []) {
-  const card = el('section', 'card tint-red');
-  const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', 'Tiendas bajo umbral'));
-  add(head, el('div', 'micro', `Top ${Math.min(items.length, 3)}`));
-  const body = add(card, el('div', 'card-body'));
+  const { card, body } = accordionCard('Tiendas bajo umbral', { tint: 'tint-red', meta: `Top ${Math.min(items.length, 3)}` });
   const list = add(body, el('ul', 'red-list'));
   items.slice(0, 3).forEach(item => {
     const row = add(list, el('li', 'red-row'));
@@ -179,10 +182,7 @@ function redFlags(items = []) {
 
 function summary(data, mobile = false) {
   const facts = factsMap(data.executive_summary?.facts);
-  const card = el('section', 'card');
-  const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', 'Resumen ejecutivo'));
-  const body = add(card, el('div', 'card-body'));
+  const { card, body } = accordionCard('Resumen ejecutivo', { open: !mobile });
   add(body, el('p', 'summary-text', mobile ? data.executive_summary?.mobile_hint : data.executive_summary?.desktop_hint));
   const list = add(body, el('ul', 'facts-list'));
   const rows = [
@@ -200,10 +200,7 @@ function summary(data, mobile = false) {
 }
 
 function listCard(title, items = [], limit = 5, tint = '') {
-  const card = el('section', `card ${tint}`);
-  const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', title));
-  const body = add(card, el('div', 'card-body'));
+  const { card, body } = accordionCard(title, { tint, meta: `Top ${Math.min(items.length, limit)}` });
   const list = add(body, el('ul', 'store-list'));
   items.slice(0, limit).forEach((item, idx) => addStoreRow(list, item, idx));
   return card;
@@ -221,14 +218,13 @@ function qualitativeAlerts(data) {
   const alerts = q.top_alerts || [];
   if (!hasItems(alerts)) return null;
 
-  const card = el('details', 'card accordion-card tint-red');
-  if ((q.critical_count || 0) > 0) card.open = true;
+  const meta = `${int(q.critical_count || 0)} críticas · ${int(q.high_count || 0)} altas`;
+  const { card, body } = accordionCard('Alertas cualitativas', {
+    tint: 'tint-red',
+    meta,
+    open: (q.critical_count || 0) > 0
+  });
 
-  const summaryNode = add(card, el('summary', 'accordion-summary'));
-  const title = add(summaryNode, el('span', 'micro', 'Alertas cualitativas'));
-  title.append(` · ${int(q.critical_count || 0)} críticas · ${int(q.high_count || 0)} altas`);
-
-  const body = add(card, el('div', 'card-body'));
   const list = add(body, el('ul', 'qual-list'));
   alerts.slice(0, 5).forEach(alert => {
     const row = add(list, el('li', 'qual-row'));
