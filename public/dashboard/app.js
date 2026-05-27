@@ -63,10 +63,11 @@ function kpi(title, value, sub, tint, valueClass = '') {
 function actionItems(data) {
   const k = data.kpis || {};
   const p = data.mobile_priority || {};
+  const c = data.competitive_summary || {};
   return [
-    { label: 'Tiendas críticas', value: p.critical_count ?? k.critical_stores, cls: '', items: data.red_flags || [] },
-    { label: 'Deterioro acelerado', value: p.accelerating_count ?? 0, cls: 'warn-tile', items: data.movements?.down || [] },
-    { label: 'Requieren intervención', value: p.immediate_action_count ?? 0, cls: '', items: (data.red_flags || []).slice(0, p.immediate_action_count || 2) }
+    { label: 'Pierden su zona', value: c.risk_count ?? 0, cls: '', items: data.local_competitive_risk || [] },
+    { label: 'Tiendas bajo umbral', value: p.critical_count ?? k.critical_stores, cls: 'warn-tile', items: data.red_flags || [] },
+    { label: 'Requieren intervención', value: p.immediate_action_count ?? 0, cls: '', items: (data.local_competitive_risk || []).slice(0, p.immediate_action_count || 2) }
   ];
 }
 
@@ -100,7 +101,7 @@ function actionCards(data) {
 }
 
 function makePrompt(action, data) {
-  const names = (action.items || []).slice(0, Number(action.value) || 5).map(x => x.name).filter(Boolean).join(', ');
+  const names = (action.items || []).slice(0, Number(action.value) || 5).map(x => x.name || x.own_name).filter(Boolean).join(', ');
   return `Analiza ${action.label.toLowerCase()} del tenant ${data.tenant_id}. Prioriza ${names}. Entrega diagnóstico, evidencia, riesgo y acción recomendada.`;
 }
 
@@ -124,24 +125,40 @@ function renderActionDetail(target, action, data) {
   copy.type = 'button';
   copy.addEventListener('click', () => copyPrompt(copy, action, data));
   const list = add(target, el('ul', 'store-list'));
-  (action.items || []).slice(0, Number(action.value) || 5).forEach((item, idx) => {
-    const row = add(list, el('li', 'store-row'));
-    add(row, el('div', 'rank', item.rank || idx + 1));
-    const main = add(row, el('div', 'store-main'));
-    add(main, el('div', 'store-name', item.name));
-    add(main, el('div', 'location', item.location || item.reason || ''));
-    if (item.reason) add(main, el('div', 'reason', item.reason));
-    const metrics = add(row, el('div', 'store-metrics'));
-    add(metrics, el('div', 'rating', fmt(item.rating)));
-    add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
-    if (item.review_count) add(metrics, el('div', 'reviews', `${int(item.review_count)} reviews`));
-  });
+  (action.items || []).slice(0, Number(action.value) || 5).forEach((item, idx) => addStoreRow(list, item, idx));
+}
+
+function addStoreRow(list, item, idx) {
+  const row = add(list, el('li', 'store-row'));
+  add(row, el('div', 'rank', item.rank || item.local_rank || idx + 1));
+  const main = add(row, el('div', 'store-main'));
+  add(main, el('div', 'store-name', item.name || item.own_name));
+  add(main, el('div', 'location', item.location || item.reason || ''));
+  if (item.reason) add(main, el('div', 'reason', item.reason));
+  if (item.leader_name) add(main, el('div', 'reason', `Líder local: ${item.leader_name} · ${fmt(item.leader_rating, 1)}`));
+  const metrics = add(row, el('div', 'store-metrics'));
+  add(metrics, el('div', 'rating', fmt(item.rating ?? item.own_rating)));
+  if (Number(item.gap_vs_leader)) add(metrics, el('div', 'delta risk', delta(item.gap_vs_leader)));
+  else if (Number(item.delta)) add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
+  if (item.review_count || item.own_review_count) add(metrics, el('div', 'reviews', `${int(item.review_count || item.own_review_count)} reviews`));
+}
+
+function competitiveRisk(data) {
+  if (!hasItems(data.local_competitive_risk)) return null;
+  const card = el('section', 'card competitive-card tint-red');
+  const head = add(card, el('div', 'card-head'));
+  add(head, el('div', 'micro', 'Riesgo competitivo local'));
+  const body = add(card, el('div', 'card-body'));
+  add(body, el('p', 'summary-text', data.competitive_summary?.headline || 'Hay zonas donde la red propia pierde liderazgo local.'));
+  const list = add(body, el('ul', 'store-list'));
+  data.local_competitive_risk.slice(0, 5).forEach((item, idx) => addStoreRow(list, item, idx));
+  return card;
 }
 
 function redFlags(items = []) {
   const card = el('section', 'card tint-red');
   const head = add(card, el('div', 'card-head'));
-  add(head, el('div', 'micro', 'Red flags · riesgo estructural'));
+  add(head, el('div', 'micro', 'Tiendas bajo umbral'));
   add(head, el('div', 'micro', `Top ${Math.min(items.length, 3)}`));
   const body = add(card, el('div', 'card-body'));
   const list = add(body, el('ul', 'red-list'));
@@ -157,7 +174,7 @@ function redFlags(items = []) {
     add(info, el('div', 'reason', item.reason));
     const metrics = add(row, el('div', 'red-metrics'));
     add(metrics, el('div', 'rating', fmt(item.rating)));
-    add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
+    if (Number(item.delta)) add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
     add(metrics, el('div', 'reviews', `${int(item.review_count)} reviews`));
   });
   return card;
@@ -174,8 +191,8 @@ function summary(data, mobile = false) {
   const rows = [
     ['Nota actual', fmt(facts.rating ?? data.kpis.average_rating)],
     ['Tendencia', delta(facts.rating_delta ?? data.kpis.rating_delta)],
-    ['Tiendas críticas', int(facts.critical_stores ?? data.kpis.critical_stores)],
-    ['Riesgos principales', facts.main_risk_locations || '—']
+    ['Bajo umbral', int(facts.critical_stores ?? data.kpis.critical_stores)],
+    ['Zonas que pierden', int(data.competitive_summary?.risk_count)]
   ];
   rows.forEach(([label, value]) => {
     const row = add(list, el('li', 'fact-row'));
@@ -191,16 +208,7 @@ function listCard(title, items = [], limit = 5, tint = '') {
   add(head, el('div', 'micro', title));
   const body = add(card, el('div', 'card-body'));
   const list = add(body, el('ul', 'store-list'));
-  items.slice(0, limit).forEach((item, idx) => {
-    const row = add(list, el('li', 'store-row'));
-    add(row, el('div', 'rank', item.rank || idx + 1));
-    const main = add(row, el('div', 'store-main'));
-    add(main, el('div', 'store-name', item.name));
-    add(main, el('div', 'location', item.location || item.reason || ''));
-    const metrics = add(row, el('div', 'store-metrics'));
-    add(metrics, el('div', 'rating', fmt(item.rating)));
-    add(metrics, el('div', `delta ${tone(item.delta)}`, delta(item.delta)));
-  });
+  items.slice(0, limit).forEach((item, idx) => addStoreRow(list, item, idx));
   return card;
 }
 
@@ -212,9 +220,11 @@ function desktop(data) {
   add(kpis, kpi('Nota promedio', fmt(k.average_rating), `${delta(k.rating_delta)} vs. período`, 'tint-blue'));
   add(kpis, kpi('Tendencia', trend(k.rating_delta), `${delta(k.rating_delta)} pts`, Number(k.rating_delta) < 0 ? 'tint-red' : 'tint-green', tone(k.rating_delta)));
   add(kpis, kpi('Reviews', int(k.total_reviews), `+${int(k.reviews_delta)} nuevas`, 'tint-violet'));
-  add(kpis, kpi('Tiendas críticas', int(k.critical_stores), 'Bajo umbral reputacional', 'tint-red', 'risk'));
-  add(kpis, kpi('Mayor caída', k.worst_drop?.name || '—', `${fmt(k.worst_drop?.rating)} ${delta(k.worst_drop?.delta)} · ${k.worst_drop?.location || ''}`, 'tint-red', 'small'));
-  add(kpis, kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} ${delta(k.best_store?.delta)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
+  add(kpis, kpi('Pierden su zona', int(data.competitive_summary?.risk_count), 'Riesgo competitivo local', 'tint-red', 'risk'));
+  add(kpis, kpi('Bajo umbral', int(k.critical_stores), 'Rating menor a 4.0', 'tint-red', 'risk'));
+  add(kpis, kpi('Mejor tienda', k.best_store?.name || '—', `${fmt(k.best_store?.rating)} · ${k.best_store?.location || ''}`, 'tint-green', 'small'));
+  const comp = competitiveRisk(data);
+  if (comp) add(main, comp);
   add(main, actionCards(data));
   const ctx = add(main, el('div', 'grid context-grid'));
   add(ctx, redFlags(data.red_flags));
@@ -236,15 +246,16 @@ function mobile(data) {
   const k = data.kpis;
   const p = data.mobile_priority || {};
   const hero = add(main, el('section', 'hero-card'));
-  add(hero, el('div', 'micro', 'Nota promedio'));
-  add(hero, el('div', 'hero-rating', fmt(k.average_rating)));
-  add(hero, el('div', tone(k.rating_delta), `${arrow(k.rating_delta)} ${delta(k.rating_delta)}`));
+  add(hero, el('div', 'micro', 'Riesgo competitivo local'));
+  add(hero, el('div', 'hero-rating', int(data.competitive_summary?.risk_count)));
   const crit = add(hero, el('div', 'hero-critical'));
   add(crit, el('strong', '', int(k.critical_stores)));
-  crit.append(' críticas');
-  add(hero, el('div', 'hero-headline', p.headline || data.executive_summary?.mobile_hint || ''));
+  crit.append(' bajo umbral');
+  add(hero, el('div', 'hero-headline', data.competitive_summary?.headline || p.headline || data.executive_summary?.mobile_hint || ''));
+  const comp = competitiveRisk(data);
+  if (comp) add(main, comp);
   add(main, actionCards(data));
-  add(main, el('div', 'micro risk', '⚠ Red flags'));
+  add(main, el('div', 'micro risk', '⚠ Tiendas bajo umbral'));
   add(main, redFlags(data.red_flags));
   if (hasItems(data.movements?.down)) add(main, listCard('Mayores bajas', data.movements.down, 3));
   add(main, summary(data, true));
