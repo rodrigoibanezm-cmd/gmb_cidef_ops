@@ -75,6 +75,24 @@ const PressureBoard = (() => {
     ].join('\n');
   }
 
+  function showToast(message) {
+    let toast = document.querySelector('.ops-toast');
+
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'ops-toast';
+      document.body.appendChild(toast);
+    }
+
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => {
+      toast.classList.remove('is-visible');
+    }, 2600);
+  }
+
   async function copyText(value) {
     if (!value) return false;
     try {
@@ -102,8 +120,9 @@ const PressureBoard = (() => {
     link.addEventListener('click', async event => {
       const prompt = agentPrompt(data, card);
       if (prompt) {
-        await copyText(prompt);
-        link.textContent = 'Prompt copiado · abrir agente →';
+        const copied = await copyText(prompt);
+        if (copied) showToast('Prompt copiado. Pégalo en el agente.');
+        link.textContent = copied ? 'Prompt copiado · abrir agente →' : 'Abrir agente →';
         setTimeout(() => { link.textContent = card ? 'Preguntar sobre esto →' : 'Abrir agente →'; }, 1800);
       }
     });
