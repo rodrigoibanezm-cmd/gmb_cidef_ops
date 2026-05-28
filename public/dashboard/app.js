@@ -20,7 +20,9 @@ function render(data) {
 }
 
 async function init() {
-  const tenant_id = new URLSearchParams(window.location.search).get('tenant_id');
+  const params = new URLSearchParams(window.location.search);
+  const tenant_id = params.get('tenant_id');
+  const view = params.get('view') || 'operational';
 
   if (!tenant_id) {
     state('Falta tenant_id en la URL.');
@@ -28,7 +30,7 @@ async function init() {
   }
 
   try {
-    const url = `${window.DashboardConfig.API_BASE}?tenant_id=${encodeURIComponent(tenant_id)}&view=operational`;
+    const url = `${window.DashboardConfig.API_BASE}?tenant_id=${encodeURIComponent(tenant_id)}&view=${encodeURIComponent(view)}`;
     const res = await fetch(url);
     const data = await res.json();
 
