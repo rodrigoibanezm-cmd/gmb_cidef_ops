@@ -1,10 +1,32 @@
 const PressureBoard = (() => {
-  const AREA_CONFIG = [
-    { id: 'urgente', label: 'Urgente hoy', note: 'requiere acción inmediata', open: true },
-    { id: 'importante', label: 'Importante', note: 'puede escalar esta semana' },
-    { id: 'tareas', label: 'Tareas', note: 'seguimiento operativo' },
-    { id: 'monitorear', label: 'Monitorear', note: 'señales bajo observación' }
-  ];
+  const VIEW_CONFIG = {
+    operational: {
+      product: 'NexusG · Presión operacional',
+      subtitle: 'Decisiones comprimidas para actuar sin revisar un dashboard.',
+      promptTitle: 'Analiza esta prioridad operacional',
+      areas: [
+        { id: 'urgente', label: 'Urgente hoy', note: 'requiere acción inmediata', open: true },
+        { id: 'importante', label: 'Importante', note: 'puede escalar esta semana' },
+        { id: 'tareas', label: 'Tareas', note: 'seguimiento operativo' },
+        { id: 'monitorear', label: 'Monitorear', note: 'señales bajo observación' }
+      ]
+    },
+    competitive: {
+      product: 'NexusG · Presión competitiva',
+      subtitle: 'Movimientos del mercado que requieren reacción antes de volverse posición.',
+      promptTitle: 'Analiza esta presión competitiva',
+      areas: [
+        { id: 'erosion', label: 'Erosión', note: 'ventaja debilitándose', open: true },
+        { id: 'momentum_rival', label: 'Momentum rival', note: 'competidor ganando tracción' },
+        { id: 'atributo_disputa', label: 'Atributo en disputa', note: 'diferenciación bajo presión' },
+        { id: 'presion_emergente', label: 'Presión emergente', note: 'señal competitiva temprana' }
+      ]
+    }
+  };
+
+  function viewConfig(data) {
+    return VIEW_CONFIG[data.view] || VIEW_CONFIG.operational;
+  }
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -34,7 +56,7 @@ const PressureBoard = (() => {
     const negative = Number(ctx.negative_count || 0);
     const positive = Number(ctx.positive_count || 0);
 
-    if (card.section === 'urgente') return 'weight-urgent';
+    if (card.section === 'urgente' || card.section === 'erosion') return 'weight-urgent';
     if (count >= 4 || negative >= 3) return 'weight-cluster';
     if (card.type === 'oportunidad' || (positive > 0 && negative === 0)) return 'weight-light';
     return 'weight-normal';
@@ -45,6 +67,7 @@ const PressureBoard = (() => {
     const risk = ctx.risk_type && ctx.risk_type !== 'none' ? ctx.risk_type : card.status;
     const parts = [
       ctx.location,
+      ctx.attribute,
       ctx.display_date,
       ctx.signal_count ? `${ctx.signal_count} señales` : null,
       risk
@@ -67,12 +90,15 @@ const PressureBoard = (() => {
 
   function agentPrompt(data, card) {
     if (!card) return '';
+    const cfg = viewConfig(data);
     return [
-      `Analiza esta prioridad operacional del tenant ${data.tenant_id}:`,
+      `${cfg.promptTitle} del tenant ${data.tenant_id}:`,
       card.headline,
       `Por qué importa: ${card.why_it_matters}`,
-      `Acción sugerida: ${card.suggested_action}`
-    ].join('\n');
+      card.risk ? `Riesgo: ${card.risk}` : null,
+      `Acción sugerida: ${card.suggested_action}`,
+      card.evidence?.length ? `Evidencia:\n- ${card.evidence.join('\n- ')}` : null
+    ].filter(Boolean).join('\n');
   }
 
   function showToast(message) {
@@ -128,13 +154,34 @@ const PressureBoard = (() => {
     });
   }
 
+  function renderViewSwitch(data) {
+    const wrap = el('nav', 'ops-view-switch');
+    const views = [
+      { id: 'operational', label: 'Presión operacional' },
+      { id: 'competitive', label: 'Presión competitiva' }
+    ];
+
+    views.forEach(view => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('tenant_id', data.tenant_id);
+      params.set('view', view.id);
+
+      const link = add(wrap, el('a', view.id === data.view ? 'is-active' : '', view.label));
+      link.href = `${window.location.pathname}?${params.toString()}`;
+    });
+
+    return wrap;
+  }
+
   function renderHeader(data) {
+    const cfg = viewConfig(data);
     const header = el('header', 'ops-header');
     const inner = add(header, el('div', 'ops-header-inner'));
     const left = add(inner, el('div'));
-    add(left, el('div', 'product', 'NexusG · Presión operacional'));
+    add(left, el('div', 'product', cfg.product));
     add(left, el('h1', 'tenant', titleCaseTenant(data.tenant_id)));
-    add(left, el('div', 'ops-subtitle', 'Decisiones comprimidas para actuar sin revisar un dashboard.'));
+    add(left, el('div', 'ops-subtitle', cfg.subtitle));
+    add(left, renderViewSwitch(data));
 
     const btn = add(inner, el('a', 'agent-btn', 'Abrir agente →'));
     wireAgentLink(btn, data);
@@ -173,6 +220,12 @@ const PressureBoard = (() => {
     const why = add(body, el('section', 'ops-detail-block'));
     add(why, el('div', 'ops-detail-label', 'Por qué importa'));
     add(why, el('p', '', card.why_it_matters));
+
+    if (card.risk) {
+      const risk = add(body, el('section', 'ops-detail-block'));
+      add(risk, el('div', 'ops-detail-label', 'Riesgo'));
+      add(risk, el('p', '', card.risk));
+    }
 
     const action = add(body, el('section', 'ops-detail-block'));
     add(action, el('div', 'ops-detail-label', 'Qué hacer'));
@@ -228,7 +281,7 @@ const PressureBoard = (() => {
 
     const grid = add(detail, el('div', 'ops-pressure-grid'));
     area.cards.forEach((card, index) => {
-      const className = index === 0 && area.id === 'urgente' ? 'is-primary' : '';
+      const className = index === 0 && area.open ? 'is-primary' : '';
       add(grid, renderCard(card, data, { className }));
     });
 
@@ -253,16 +306,17 @@ const PressureBoard = (() => {
   }
 
   function render(data) {
+    const cfg = viewConfig(data);
     const fragment = document.createDocumentFragment();
     add(fragment, renderHeader(data));
 
     const main = add(fragment, el('main', 'container ops-main'));
-    const areas = AREA_CONFIG
+    const areas = cfg.areas
       .map(config => {
         const cards = sectionById(data, config.id).cards;
         return { ...config, cards, temperature: areaTemperature(cards) };
       })
-      .filter(area => area.cards.length || area.id === 'urgente');
+      .filter(area => area.cards.length || area.open);
 
     add(main, renderAreaDeck(areas));
     areas.forEach(area => add(main, renderAreaDetail(area, data)));
