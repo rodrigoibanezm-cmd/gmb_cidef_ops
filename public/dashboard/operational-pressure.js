@@ -3,16 +3,6 @@ const PressureBoard = (() => {
     urgente: 'Urgente hoy'
   };
 
-  const ICONS = {
-    legal: '⚖️',
-    incident: '⚠️',
-    competitive: '📉',
-    pattern: '↻',
-    operations: '◆',
-    opportunity: '◇',
-    monitoring: '·'
-  };
-
   function el(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -37,13 +27,11 @@ const PressureBoard = (() => {
 
   function signalWeight(card) {
     const ctx = card.agent_context || {};
-    const score = Number(ctx.priority_score || 0);
     const count = Number(ctx.signal_count || 1);
     const negative = Number(ctx.negative_count || 0);
     const positive = Number(ctx.positive_count || 0);
 
-    if (card.section === 'urgente' && (score >= 80 || count >= 5)) return 'weight-dominant';
-    if (card.section === 'urgente') return 'weight-strong';
+    if (card.section === 'urgente') return 'weight-urgent';
     if (count >= 4 || negative >= 3) return 'weight-cluster';
     if (card.type === 'oportunidad' || (positive > 0 && negative === 0)) return 'weight-light';
     return 'weight-normal';
@@ -51,11 +39,12 @@ const PressureBoard = (() => {
 
   function cardMeta(card) {
     const ctx = card.agent_context || {};
+    const risk = ctx.risk_type && ctx.risk_type !== 'none' ? ctx.risk_type : card.status;
     const parts = [
       ctx.location,
       ctx.display_date,
       ctx.signal_count ? `${ctx.signal_count} señales` : null,
-      ctx.risk_type || card.status
+      risk
     ].filter(Boolean);
 
     return parts.join(' · ');
@@ -109,7 +98,6 @@ const PressureBoard = (() => {
     details.dataset.cardId = card.id;
 
     const summary = add(details, el('summary', 'ops-card-summary'));
-    add(summary, el('span', 'ops-icon', ICONS[card.icon_key] || ICONS[card.type] || '•'));
     const copy = add(summary, el('span', 'ops-copy'));
     add(copy, el('span', 'ops-headline', card.headline));
     const meta = cardMeta(card);
@@ -154,10 +142,7 @@ const PressureBoard = (() => {
     add(head, el('small', '', 'presión inmediata'));
 
     const grid = add(section, el('div', 'ops-urgent-grid'));
-    cards.forEach((card, index) => {
-      const size = index === 0 ? 'signal-large' : 'signal-strong';
-      add(grid, renderCard(card, data, { className: size }));
-    });
+    cards.forEach(card => add(grid, renderCard(card, data)));
 
     return section;
   }
@@ -169,10 +154,7 @@ const PressureBoard = (() => {
     add(head, el('small', '', `${cards.length} señales restantes`));
 
     const grid = add(section, el('div', 'ops-pressure-grid'));
-    cards.forEach((card, index) => {
-      const className = index % 5 === 1 ? 'signal-tall' : index % 7 === 3 ? 'signal-wide' : '';
-      add(grid, renderCard(card, data, { className }));
-    });
+    cards.forEach(card => add(grid, renderCard(card, data)));
 
     if (!cards.length) {
       add(grid, el('div', 'ops-empty', 'Sin señales que superen umbral de acción.'));
