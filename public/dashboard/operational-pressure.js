@@ -35,6 +35,20 @@ const PressureBoard = (() => {
     return (data.sections || []).find(section => section.id === id) || { id, cards: [] };
   }
 
+  function signalWeight(card) {
+    const ctx = card.agent_context || {};
+    const score = Number(ctx.priority_score || 0);
+    const count = Number(ctx.signal_count || 1);
+    const negative = Number(ctx.negative_count || 0);
+    const positive = Number(ctx.positive_count || 0);
+
+    if (card.section === 'urgente' && (score >= 80 || count >= 5)) return 'weight-dominant';
+    if (card.section === 'urgente') return 'weight-strong';
+    if (count >= 4 || negative >= 3) return 'weight-cluster';
+    if (card.type === 'oportunidad' || (positive > 0 && negative === 0)) return 'weight-light';
+    return 'weight-normal';
+  }
+
   function cardMeta(card) {
     const ctx = card.agent_context || {};
     const parts = [
@@ -90,7 +104,8 @@ const PressureBoard = (() => {
   }
 
   function renderCard(card, data, opts = {}) {
-    const details = el('details', `ops-card color-${card.color_key || 'gray'} ${opts.className || ''}`);
+    const weight = signalWeight(card);
+    const details = el('details', `ops-card color-${card.color_key || 'gray'} ${weight} ${opts.className || ''}`);
     details.dataset.cardId = card.id;
 
     const summary = add(details, el('summary', 'ops-card-summary'));
