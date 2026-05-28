@@ -1,7 +1,10 @@
 const PressureBoard = (() => {
-  const SECTION_LABELS = {
-    urgente: 'Urgente hoy'
-  };
+  const AREA_CONFIG = [
+    { id: 'urgente', label: 'Urgente hoy', note: 'requiere acción inmediata', open: true },
+    { id: 'importante', label: 'Importante', note: 'puede escalar esta semana' },
+    { id: 'tareas', label: 'Tareas', note: 'seguimiento operativo' },
+    { id: 'monitorear', label: 'Monitorear', note: 'señales bajo observación' }
+  ];
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -50,6 +53,14 @@ const PressureBoard = (() => {
     return parts.join(' · ');
   }
 
+  function areaTemperature(cards) {
+    if (cards.some(card => card.color_key === 'red')) return 'red';
+    if (cards.some(card => card.color_key === 'orange')) return 'orange';
+    if (cards.some(card => card.color_key === 'yellow')) return 'yellow';
+    if (cards.some(card => card.color_key === 'blue')) return 'blue';
+    return 'gray';
+  }
+
   function agentUrl(data, card) {
     const base = window.DashboardConfig.AGENT_URLS[data.tenant_id] || '#';
     if (!card || base === '#') return base;
@@ -68,9 +79,9 @@ const PressureBoard = (() => {
     const header = el('header', 'ops-header');
     const inner = add(header, el('div', 'ops-header-inner'));
     const left = add(inner, el('div'));
-    add(left, el('div', 'product', 'NexusG · Señales activas'));
+    add(left, el('div', 'product', 'NexusG · Triaje operacional ejecutivo'));
     add(left, el('h1', 'tenant', titleCaseTenant(data.tenant_id)));
-    add(left, el('div', 'ops-subtitle', `${data.card_count || 0} prioridades activas · máximo visible ${data.max_cards || 12}`));
+    add(left, el('div', 'ops-subtitle', 'Decisiones comprimidas para actuar sin revisar un dashboard.'));
 
     const btn = add(inner, el('a', 'agent-btn', 'Abrir agente →'));
     btn.href = agentUrl(data);
@@ -135,32 +146,57 @@ const PressureBoard = (() => {
     return details;
   }
 
-  function renderUrgent(cards, data) {
-    const section = el('section', 'ops-zone ops-zone-urgent');
-    const head = add(section, el('div', 'ops-zone-head'));
-    add(head, el('span', '', SECTION_LABELS.urgente));
-    add(head, el('small', '', 'presión inmediata'));
+  function renderAreaDeck(areas) {
+    const deck = el('section', 'ops-area-deck');
 
-    const grid = add(section, el('div', 'ops-urgent-grid'));
-    cards.forEach(card => add(grid, renderCard(card, data)));
+    areas.forEach(area => {
+      const button = add(deck, el('button', `ops-area-pill color-${area.temperature}`));
+      button.type = 'button';
+      button.dataset.areaId = area.id;
+      if (area.open) button.classList.add('is-active');
 
-    return section;
+      add(button, el('span', 'ops-area-count', String(area.cards.length)));
+      const copy = add(button, el('span', 'ops-area-copy'));
+      add(copy, el('strong', '', area.label));
+      add(copy, el('small', '', area.note));
+    });
+
+    return deck;
   }
 
-  function renderPressureField(cards, data) {
-    const section = el('section', 'ops-zone ops-zone-field');
-    const head = add(section, el('div', 'ops-zone-head'));
-    add(head, el('span', '', 'Campo de presión'));
-    add(head, el('small', '', `${cards.length} señales restantes`));
+  function renderAreaDetail(area, data) {
+    const detail = el('section', `ops-area-detail color-${area.temperature}`);
+    detail.dataset.areaId = area.id;
+    if (area.open) detail.classList.add('is-active');
 
-    const grid = add(section, el('div', 'ops-pressure-grid'));
-    cards.forEach(card => add(grid, renderCard(card, data)));
+    const head = add(detail, el('div', 'ops-zone-head'));
+    add(head, el('span', '', area.label));
+    add(head, el('small', '', `${area.cards.length} señales`));
 
-    if (!cards.length) {
+    const grid = add(detail, el('div', 'ops-pressure-grid'));
+    area.cards.forEach((card, index) => {
+      const className = index === 0 && area.id === 'urgente' ? 'is-primary' : '';
+      add(grid, renderCard(card, data, { className }));
+    });
+
+    if (!area.cards.length) {
       add(grid, el('div', 'ops-empty', 'Sin señales que superen umbral de acción.'));
     }
 
-    return section;
+    return detail;
+  }
+
+  function attachAreaBehavior(root) {
+    const buttons = [...root.querySelectorAll('.ops-area-pill')];
+    const details = [...root.querySelectorAll('.ops-area-detail')];
+
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const id = button.dataset.areaId;
+        buttons.forEach(item => item.classList.toggle('is-active', item === button));
+        details.forEach(item => item.classList.toggle('is-active', item.dataset.areaId === id));
+      });
+    });
   }
 
   function render(data) {
@@ -168,14 +204,16 @@ const PressureBoard = (() => {
     add(fragment, renderHeader(data));
 
     const main = add(fragment, el('main', 'container ops-main'));
-    const urgent = sectionById(data, 'urgente').cards;
-    const pressureCards = [
-      ...sectionById(data, 'tareas').cards,
-      ...sectionById(data, 'importante').cards
-    ];
+    const areas = AREA_CONFIG
+      .map(config => {
+        const cards = sectionById(data, config.id).cards;
+        return { ...config, cards, temperature: areaTemperature(cards) };
+      })
+      .filter(area => area.cards.length || area.id === 'urgente');
 
-    add(main, renderUrgent(urgent, data));
-    add(main, renderPressureField(pressureCards, data));
+    add(main, renderAreaDeck(areas));
+    areas.forEach(area => add(main, renderAreaDetail(area, data)));
+    attachAreaBehavior(main);
 
     const mobileAgent = add(fragment, el('a', 'mobile-agent', 'Abrir agente ↗'));
     mobileAgent.href = agentUrl(data);
