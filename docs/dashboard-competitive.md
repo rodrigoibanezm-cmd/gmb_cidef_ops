@@ -1,4 +1,4 @@
-# Pitch — Presión competitiva
+# Principios — Presión competitiva
 
 ## Estado
 
@@ -6,61 +6,81 @@
 wish list / hipótesis de producto
 ```
 
-Este documento no cierra contrato técnico ni JSON final.
+Este documento no cierra contrato técnico, JSON final ni implementación.
 
-Su objetivo es dejar registrada la intención de producto para una futura capa de dashboard basada en presión competitiva.
-
-## Problema
-
-Hoy el sistema ya captura información de competencia en GMB.
-
-El riesgo es exponer esa información como dashboard tradicional:
-
-```txt
-rankings
-benchmarks
-tablas
-gráficos
-market share
-competidor #1
-```
-
-Eso volvería a poner al usuario en modo analista.
-
-## Propuesta
-
-Crear una nueva superficie llamada:
+Su objetivo es dejar principios y reglas para una futura superficie llamada:
 
 ```txt
 Presión competitiva
 ```
 
-No debe describir competencia.
-No debe reportar métricas.
-No debe mostrar BI.
-
-Debe exponer:
+## Definición
 
 ```txt
-desplazamientos perceptuales accionables
+Presión competitiva expone movimientos del mercado que requieren reacción antes de volverse posición.
 ```
 
-Definición base:
+No nace para describir competidores.
+
+Nace para mostrar dónde la percepción de mercado se está moviendo y dónde conviene intervenir temprano.
+
+## Principios
+
+### 1. La pantalla expone desplazamiento perceptual accionable
+
+La unidad principal no es el competidor.
+
+La unidad principal es el movimiento perceptual que puede afectar preferencia, confianza o diferenciación.
+
+### 2. La presión competitiva se entiende como movimiento
+
+La pantalla debe mostrar algo que está cambiando.
+
+No busca mostrar estado, ranking ni foto estática.
+
+### 3. La card comprime tensión para decidir
+
+Cada card debe ayudar a entender rápidamente:
 
 ```txt
-Presión competitiva no informa sobre competidores.
-Expone movimientos del mercado que requieren reacción antes de volverse posición.
+qué está cambiando
+por qué importa
+qué riesgo genera
+qué acción inicial tomar
 ```
 
-## Principio de diseño
+### 4. La acción aparece antes que el análisis
 
-Misma carcasa que Presión operacional.
+La lectura debe empujar intervención.
+
+El usuario no debería terminar pensando “tengo que analizar esto”, sino “tengo que actuar acá”.
+
+### 5. La evidencia sostiene confianza sin dominar la lectura
+
+La evidencia debe estar disponible y ser concreta.
+
+Pero no debe convertirse en el centro de la pantalla.
+
+### 6. El agente entrega profundidad cuando el usuario la pide
+
+La card no intenta explicar todo.
+
+```txt
+Card = compresión para decidir.
+Agente = profundidad para entender.
+```
+
+Cada card debe tener bajada directa al agente.
+
+### 7. Misma carcasa, distinta fuente de presión
+
+Presión competitiva debe sentirse como parte del mismo sistema que Presión operacional.
 
 ```txt
 misma interacción
 misma lógica de cards
-misma bajada al agente
 misma compresión ejecutiva
+misma bajada al agente
 ```
 
 Cambia el origen de la presión:
@@ -68,6 +88,25 @@ Cambia el origen de la presión:
 ```txt
 Presión operacional = dónde intervenir mi operación.
 Presión competitiva = dónde me están desplazando en percepción de mercado.
+```
+
+### 8. El lenguaje debe sonar contextual, no genérico
+
+Cada card debe parecer nacida de una señal real.
+
+Debe evitar sonar como plantilla repetida.
+
+## Reglas
+
+```txt
+1. Sin rankings visibles.
+2. Sin charts.
+3. Sin tablas comparativas.
+4. Sin métricas protagonistas.
+5. Sin lenguaje consultora.
+6. Sin clasificación en frontend.
+7. Sin sobreinterpretar señales débiles.
+8. Sin convertir todas las cards en la misma frase con distinto nombre.
 ```
 
 ## Claim tentativo
@@ -93,38 +132,6 @@ Presión emergente
 
 Estas categorías son lenguaje de producto, no contrato técnico cerrado.
 
-## Qué debería mostrar una card
-
-Una card debería comprimir:
-
-```txt
-qué presión existe
-por qué importa
-qué riesgo genera
-qué hacer
-```
-
-La evidencia debe existir, pero no ser protagonista.
-
-Regla:
-
-```txt
-evidencia mínima, expandible, suficiente para no parecer inventado
-```
-
-## Relación con el agente
-
-La pantalla no debe intentar explicarlo todo.
-
-```txt
-Card = compresión para decidir.
-Agente = profundidad para entender.
-```
-
-Cada tarjeta debe tener bajada directa al agente.
-
-El prompt enviado al agente puede ser más rico que el texto visible.
-
 ## Valor esperado
 
 La capa debería permitir detectar temprano:
@@ -142,17 +149,6 @@ El valor está en saber:
 
 ```txt
 dónde reaccionar antes de que la percepción se consolide
-```
-
-## Riesgos a cuidar
-
-```txt
-1. Convertir presión en plantilla genérica.
-2. Usar lenguaje consultora.
-3. Sobreinterpretar señales débiles.
-4. Mostrar métricas como protagonista.
-5. Hacer que el frontend clasifique o agrupe.
-6. Hacer que todas las cards suenen iguales.
 ```
 
 ## Fuera de alcance por ahora
