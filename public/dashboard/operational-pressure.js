@@ -35,6 +35,18 @@ const PressureBoard = (() => {
     return (data.sections || []).find(section => section.id === id) || { id, cards: [] };
   }
 
+  function cardMeta(card) {
+    const ctx = card.agent_context || {};
+    const parts = [
+      ctx.location,
+      ctx.display_date,
+      ctx.signal_count ? `${ctx.signal_count} señales` : null,
+      ctx.risk_type || card.status
+    ].filter(Boolean);
+
+    return parts.join(' · ');
+  }
+
   function agentUrl(data, card) {
     const base = window.DashboardConfig.AGENT_URLS[data.tenant_id] || '#';
     if (!card || base === '#') return base;
@@ -72,8 +84,8 @@ const PressureBoard = (() => {
     add(wrap, el('div', 'ops-detail-label', 'Señales agrupadas'));
     children.slice(0, 3).forEach(child => {
       const row = add(wrap, el('div', 'ops-child'));
-      add(row, el('strong', '', child.headline || child.title || child.label || 'Señal relacionada'));
-      if (child.summary || child.evidence) add(row, el('span', '', child.summary || child.evidence));
+      add(row, el('strong', '', child.safe_label || child.headline || child.title || child.label || 'Señal relacionada'));
+      if (child.summary || child.evidence_excerpt || child.evidence) add(row, el('span', '', child.summary || child.evidence_excerpt || child.evidence));
     });
   }
 
@@ -85,6 +97,8 @@ const PressureBoard = (() => {
     add(summary, el('span', 'ops-icon', ICONS[card.icon_key] || ICONS[card.type] || '•'));
     const copy = add(summary, el('span', 'ops-copy'));
     add(copy, el('span', 'ops-headline', card.headline));
+    const meta = cardMeta(card);
+    if (meta) add(copy, el('span', 'ops-meta', meta));
     add(summary, el('span', 'ops-chevron', '›'));
 
     const body = add(details, el('div', 'ops-card-body'));
@@ -136,7 +150,7 @@ const PressureBoard = (() => {
   function renderPressureField(cards, data) {
     const section = el('section', 'ops-zone ops-zone-field');
     const head = add(section, el('div', 'ops-zone-head'));
-    add(head, el('span', '', 'Pressure field'));
+    add(head, el('span', '', 'Campo de presión'));
     add(head, el('small', '', `${cards.length} señales restantes`));
 
     const grid = add(section, el('div', 'ops-pressure-grid'));
