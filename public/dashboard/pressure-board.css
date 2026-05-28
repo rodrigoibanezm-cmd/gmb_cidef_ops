@@ -81,6 +81,34 @@ button { font: inherit; }
   font-size: 18px;
 }
 
+.ops-view-switch {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(31,35,40,.06);
+  border: 1px solid rgba(31,35,40,.06);
+}
+
+.ops-view-switch a {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.ops-view-switch a.is-active {
+  background: var(--command);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(31,35,40,.12);
+}
+
 .agent-btn,
 .mobile-agent,
 .ops-card-agent {
@@ -406,6 +434,15 @@ button { font: inherit; }
 
   .ops-subtitle {
     font-size: 15px;
+  }
+
+  .ops-view-switch {
+    width: 100%;
+  }
+
+  .ops-view-switch a {
+    flex: 1;
+    justify-content: center;
   }
 
   .ops-area-deck,
