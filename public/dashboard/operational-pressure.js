@@ -79,7 +79,7 @@ const PressureBoard = (() => {
     const header = el('header', 'ops-header');
     const inner = add(header, el('div', 'ops-header-inner'));
     const left = add(inner, el('div'));
-    add(left, el('div', 'product', 'NexusG · Triaje operacional ejecutivo'));
+    add(left, el('div', 'product', 'NexusG · Presión operacional'));
     add(left, el('h1', 'tenant', titleCaseTenant(data.tenant_id)));
     add(left, el('div', 'ops-subtitle', 'Decisiones comprimidas para actuar sin revisar un dashboard.'));
 
