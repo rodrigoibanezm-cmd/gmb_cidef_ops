@@ -1,3 +1,4 @@
+import { rebuildOperationalCards } from "../../lib/dashboard/operationalCards.js";
 import { dbQuery } from "../../lib/gmb/postgres.js";
 
 const CLASSIFICATION_VERSION = "v1";
@@ -56,6 +57,11 @@ function normalizeEnum(value, allowed, fallback) {
 function excerpt(text, max = 600) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+function uniqueTenantIdFromSaved(saved) {
+  const tenants = [...new Set(saved.map((item) => item.tenant_id).filter(Boolean))];
+  return tenants.length === 1 ? tenants[0] : null;
 }
 
 async function readMissingReviews({ tenantId, scope, limit }) {
@@ -230,6 +236,21 @@ async function handleCommit(req, res) {
     }
   }
 
+  let operationalCards = null;
+  let operationalCardsError = null;
+  const tenantId = uniqueTenantIdFromSaved(saved);
+
+  if (saved.length > 0 && tenantId) {
+    try {
+      operationalCards = await rebuildOperationalCards({ tenantId });
+    } catch (error) {
+      operationalCardsError = {
+        code: error.code || "operational_cards_rebuild_failed",
+        message: error.message,
+      };
+    }
+  }
+
   return res.status(200).json({
     ok: errors.length === 0,
     action: "commit",
@@ -238,6 +259,9 @@ async function handleCommit(req, res) {
     saved: saved.length,
     failed: errors.length,
     critical_alerts: saved.filter(item => item.severity === "critical").length,
+    operational_cards_rebuilt: Boolean(operationalCards),
+    operational_cards: operationalCards,
+    operational_cards_error: operationalCardsError,
     results: saved,
     errors,
   });
