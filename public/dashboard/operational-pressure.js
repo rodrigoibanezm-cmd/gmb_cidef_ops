@@ -61,18 +61,52 @@ const PressureBoard = (() => {
     return 'gray';
   }
 
-  function agentUrl(data, card) {
-    const base = window.DashboardConfig.AGENT_URLS[data.tenant_id] || '#';
-    if (!card || base === '#') return base;
+  function agentUrl(data) {
+    return window.DashboardConfig.AGENT_URLS[data.tenant_id] || '#';
+  }
 
-    const prompt = [
+  function agentPrompt(data, card) {
+    if (!card) return '';
+    return [
       `Analiza esta prioridad operacional del tenant ${data.tenant_id}:`,
       card.headline,
       `Por qué importa: ${card.why_it_matters}`,
       `Acción sugerida: ${card.suggested_action}`
     ].join('\n');
+  }
 
-    return `${base}?q=${encodeURIComponent(prompt)}`;
+  async function copyText(value) {
+    if (!value) return false;
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (e) {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.setAttribute('readonly', '');
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(input);
+      return ok;
+    }
+  }
+
+  function wireAgentLink(link, data, card) {
+    link.href = agentUrl(data);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+
+    link.addEventListener('click', async event => {
+      const prompt = agentPrompt(data, card);
+      if (prompt) {
+        await copyText(prompt);
+        link.textContent = 'Prompt copiado · abrir agente →';
+        setTimeout(() => { link.textContent = card ? 'Preguntar sobre esto →' : 'Abrir agente →'; }, 1800);
+      }
+    });
   }
 
   function renderHeader(data) {
@@ -84,7 +118,7 @@ const PressureBoard = (() => {
     add(left, el('div', 'ops-subtitle', 'Decisiones comprimidas para actuar sin revisar un dashboard.'));
 
     const btn = add(inner, el('a', 'agent-btn', 'Abrir agente →'));
-    btn.href = agentUrl(data);
+    wireAgentLink(btn, data);
     return header;
   }
 
@@ -134,7 +168,7 @@ const PressureBoard = (() => {
 
     const footer = add(body, el('div', 'ops-card-footer'));
     const ask = add(footer, el('a', 'ops-card-agent', 'Preguntar sobre esto →'));
-    ask.href = agentUrl(data, card);
+    wireAgentLink(ask, data, card);
 
     details.addEventListener('toggle', () => {
       if (!details.open) return;
@@ -216,7 +250,7 @@ const PressureBoard = (() => {
     attachAreaBehavior(main);
 
     const mobileAgent = add(fragment, el('a', 'mobile-agent', 'Abrir agente ↗'));
-    mobileAgent.href = agentUrl(data);
+    wireAgentLink(mobileAgent, data);
 
     return fragment;
   }
