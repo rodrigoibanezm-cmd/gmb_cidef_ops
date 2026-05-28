@@ -10,9 +10,9 @@ const ICONS = {
   legal: '⚖️',
   incident: '⚠️',
   competitive: '📉',
-  pattern: '🔁',
-  operations: '🛠️',
-  opportunity: '💡',
+  pattern: '↻',
+  operations: '◆',
+  opportunity: '◇',
   monitoring: '·'
 };
 
@@ -43,6 +43,10 @@ function titleCaseTenant(value) {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function sectionById(data, id) {
+  return (data.sections || []).find(section => section.id === id) || { id, cards: [] };
+}
+
 function agentUrl(data, card) {
   const base = window.DashboardConfig.AGENT_URLS[data.tenant_id] || '#';
   if (!card || base === '#') return base;
@@ -61,9 +65,9 @@ function renderHeader(data) {
   const header = el('header', 'ops-header');
   const inner = add(header, el('div', 'ops-header-inner'));
   const left = add(inner, el('div'));
-  add(left, el('div', 'product', 'NexusG · Triage operacional ejecutivo'));
+  add(left, el('div', 'product', 'NexusG · Señales activas'));
   add(left, el('h1', 'tenant', titleCaseTenant(data.tenant_id)));
-  add(left, el('div', 'ops-subtitle', 'Decisiones comprimidas para actuar sin revisar un dashboard.'));
+  add(left, el('div', 'ops-subtitle', `${data.card_count || 0} prioridades activas · máximo visible ${data.max_cards || 12}`));
 
   const btn = add(inner, el('a', 'agent-btn', 'Abrir agente →'));
   btn.href = agentUrl(data);
@@ -86,13 +90,14 @@ function renderChildren(parent, children = []) {
   });
 }
 
-function renderCard(card, data) {
-  const details = el('details', `ops-card color-${card.color_key || 'gray'}`);
+function renderCard(card, data, opts = {}) {
+  const details = el('details', `ops-card color-${card.color_key || 'gray'} ${opts.className || ''}`);
   details.dataset.cardId = card.id;
 
   const summary = add(details, el('summary', 'ops-card-summary'));
   add(summary, el('span', 'ops-icon', ICONS[card.icon_key] || ICONS[card.type] || '•'));
-  add(summary, el('span', 'ops-headline', card.headline));
+  const copy = add(summary, el('span', 'ops-copy'));
+  add(copy, el('span', 'ops-headline', card.headline));
   add(summary, el('span', 'ops-chevron', '›'));
 
   const body = add(details, el('div', 'ops-card-body'));
@@ -126,20 +131,38 @@ function renderCard(card, data) {
   return details;
 }
 
-function renderSection(section, data) {
-  const wrap = el('section', 'ops-section');
-  const header = add(wrap, el('div', 'ops-section-header'));
-  add(header, el('h2', '', SECTION_LABELS[section.id] || section.id));
-  add(header, el('span', '', `${section.cards.length}`));
+function renderUrgent(cards, data) {
+  const section = el('section', 'ops-zone ops-zone-urgent');
+  const head = add(section, el('div', 'ops-zone-head'));
+  add(head, el('span', '', SECTION_LABELS.urgente));
+  add(head, el('small', '', 'presión inmediata'));
 
-  const grid = add(wrap, el('div', 'ops-card-grid'));
-  section.cards.forEach(card => add(grid, renderCard(card, data)));
+  const grid = add(section, el('div', 'ops-urgent-grid'));
+  cards.forEach((card, index) => {
+    const size = index === 0 ? 'signal-large' : 'signal-strong';
+    add(grid, renderCard(card, data, { className: size }));
+  });
 
-  if (!section.cards.length) {
+  return section;
+}
+
+function renderPressureField(cards, data) {
+  const section = el('section', 'ops-zone ops-zone-field');
+  const head = add(section, el('div', 'ops-zone-head'));
+  add(head, el('span', '', 'Pressure field'));
+  add(head, el('small', '', `${cards.length} señales restantes`));
+
+  const grid = add(section, el('div', 'ops-pressure-grid'));
+  cards.forEach((card, index) => {
+    const className = index % 5 === 1 ? 'signal-tall' : index % 7 === 3 ? 'signal-wide' : '';
+    add(grid, renderCard(card, data, { className }));
+  });
+
+  if (!cards.length) {
     add(grid, el('div', 'ops-empty', 'Sin señales que superen umbral de acción.'));
   }
 
-  return wrap;
+  return section;
 }
 
 function render(data) {
@@ -147,11 +170,14 @@ function render(data) {
   add(app, renderHeader(data));
 
   const main = add(app, el('main', 'container ops-main'));
-  const summary = add(main, el('section', 'ops-brief'));
-  add(summary, el('div', 'ops-brief-title', 'Qué requiere atención'));
-  add(summary, el('p', '', `${data.card_count || 0} prioridades activas. Máximo visible: ${data.max_cards || 12}.`));
+  const urgent = sectionById(data, 'urgente').cards;
+  const pressureCards = [
+    ...sectionById(data, 'tareas').cards,
+    ...sectionById(data, 'importante').cards
+  ];
 
-  (data.sections || []).forEach(section => add(main, renderSection(section, data)));
+  add(main, renderUrgent(urgent, data));
+  add(main, renderPressureField(pressureCards, data));
 
   const mobileAgent = add(app, el('a', 'mobile-agent', 'Abrir agente ↗'));
   mobileAgent.href = agentUrl(data);
