@@ -2,7 +2,8 @@ import {
   ALLOWED_TENANTS,
   ALLOWED_VIEWS,
   getDashboardFromNeon,
-  getOperationalDashboardFromNeon
+  getOperationalDashboardFromNeon,
+  getCompetitiveDashboardFromNeon
 } from '../lib/dashboard/neonDashboard.js';
 
 export default async function handler(req, res) {
@@ -50,6 +51,12 @@ export default async function handler(req, res) {
   try {
     if (view === 'operational') {
       const payload = await getOperationalDashboardFromNeon(tenant_id);
+
+      return res.status(200).json(payload);
+    }
+
+    if (view === 'competitive') {
+      const payload = await getCompetitiveDashboardFromNeon(tenant_id);
 
       return res.status(200).json(payload);
     }
