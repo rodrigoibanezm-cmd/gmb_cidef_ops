@@ -221,12 +221,6 @@ const PressureBoard = (() => {
     add(why, el('div', 'ops-detail-label', 'Por qué importa'));
     add(why, el('p', '', card.why_it_matters));
 
-    if (card.risk) {
-      const risk = add(body, el('section', 'ops-detail-block'));
-      add(risk, el('div', 'ops-detail-label', 'Riesgo'));
-      add(risk, el('p', '', card.risk));
-    }
-
     const action = add(body, el('section', 'ops-detail-block'));
     add(action, el('div', 'ops-detail-label', 'Qué hacer'));
     add(action, el('p', '', card.suggested_action));
