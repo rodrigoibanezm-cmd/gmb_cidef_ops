@@ -2,7 +2,7 @@ const PressureBoard = (() => {
   const VIEW_CONFIG = {
     operational: {
       product: 'NexusG · Presión operacional',
-      subtitle: 'Decisiones comprimidas para actuar sin revisar un dashboard.',
+      subtitle: 'Presión priorizada para decidir dónde actuar primero.',
       promptTitle: 'Analiza esta prioridad operacional',
       areas: [
         { id: 'urgente', label: 'Urgente hoy', note: 'requiere acción inmediata', open: true },
