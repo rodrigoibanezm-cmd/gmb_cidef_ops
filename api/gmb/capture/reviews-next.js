@@ -325,7 +325,7 @@ export default async function handler(req, res) {
       const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
       const pattern = safePattern(req.query.pattern || "gmb:review:*");
       const count = parseIntParam(req.query.count, 100, 1000);
-      const limit = parseIntParam(req.query.limit, 100, 300);
+      const limit = parseIntParam(req.query.limit, 100, 1000);
       const cursor = safeCursor(req.query.cursor);
       const result = await countKeysByTenantPage({ pattern, count, limit, cursor, tenantId });
       return res.status(200).json({ ok: true, temporary: true, action, pattern, limit, ...result });
