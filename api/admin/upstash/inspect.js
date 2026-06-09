@@ -1,9 +1,3 @@
-function requireAdminToken(req) {
-  const expected = process.env.ADMIN_TOKEN || process.env.MIGRATION_TOKEN;
-  const provided = req.query.token || req.headers["x-admin-token"];
-  return Boolean(expected && provided && provided === expected);
-}
-
 function requireUpstashEnv() {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
   const token =
@@ -136,10 +130,6 @@ async function inspectKey({ key, maxChars }) {
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
-  }
-
-  if (!requireAdminToken(req)) {
-    return res.status(401).json({ ok: false, error: "unauthorized" });
   }
 
   const action = req.query.action || "scan";
