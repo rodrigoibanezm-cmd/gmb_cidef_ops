@@ -23,6 +23,12 @@ function parseIntParam(value, fallback, max) {
   return Math.min(Math.floor(n), max);
 }
 
+function safeCursor(cursor) {
+  const value = typeof cursor === "string" && cursor.trim() ? cursor.trim() : "0";
+  if (!/^\d+$/.test(value)) throw new Error("cursor_not_allowed");
+  return value;
+}
+
 function safePattern(pattern) {
   const value = typeof pattern === "string" && pattern.trim() ? pattern.trim() : "gmb:review:*";
   if (!value.startsWith("gmb:review:")) throw new Error("pattern_not_allowed");
@@ -67,8 +73,8 @@ function asPreview(value, maxChars) {
   };
 }
 
-async function scanKeys(pattern, count, maxKeys) {
-  let cursor = "0";
+async function scanKeys(pattern, count, maxKeys, startCursor = "0") {
+  let cursor = startCursor;
   const keys = [];
 
   do {
@@ -82,7 +88,7 @@ async function scanKeys(pattern, count, maxKeys) {
     }
   } while (cursor !== "0" && keys.length < maxKeys);
 
-  return keys;
+  return { keys, next_cursor: cursor };
 }
 
 async function inspectKey(key, maxChars) {
@@ -169,20 +175,23 @@ async function upsertMigratedReview(review, tenantId) {
   );
 }
 
-async function migrateReviews({ pattern, count, limit, dryRun }) {
-  const keys = await scanKeys(pattern, count, limit);
+async function migrateReviews({ pattern, count, limit, cursor, dryRun }) {
+  const scan = await scanKeys(pattern, count, limit, cursor);
   const result = {
-    scanned: keys.length,
+    cursor,
+    next_cursor: scan.next_cursor,
+    scanned: scan.keys.length,
     inserted_or_updated: 0,
     skipped_unknown_place: 0,
     failed: 0,
     dry_run: dryRun,
+    done: scan.next_cursor === "0",
     errors: [],
   };
 
   const tenantCache = new Map();
 
-  for (const key of keys) {
+  for (const key of scan.keys) {
     try {
       const raw = await redis(["GET", key]);
       const review = parseReview(raw);
@@ -235,8 +244,9 @@ export default async function handler(req, res) {
       const pattern = safePattern(req.query.pattern);
       const count = parseIntParam(req.query.count, 100, 1000);
       const maxKeys = parseIntParam(req.query.max_keys, 100, 500);
-      const keys = await scanKeys(pattern, count, maxKeys);
-      return res.status(200).json({ ok: true, temporary: true, action, pattern, keys });
+      const cursor = safeCursor(req.query.cursor);
+      const scan = await scanKeys(pattern, count, maxKeys, cursor);
+      return res.status(200).json({ ok: true, temporary: true, action, pattern, cursor, ...scan });
     }
 
     if (action === "get") {
@@ -249,22 +259,24 @@ export default async function handler(req, res) {
       const pattern = safePattern(req.query.pattern);
       const count = parseIntParam(req.query.count, 100, 1000);
       const maxKeys = parseIntParam(req.query.max_keys, 20, 50);
-      const keys = await scanKeys(pattern, count, maxKeys);
+      const cursor = safeCursor(req.query.cursor);
+      const scan = await scanKeys(pattern, count, maxKeys, cursor);
       const items = [];
 
-      for (const key of keys) {
+      for (const key of scan.keys) {
         items.push(await inspectKey(key, maxChars));
       }
 
-      return res.status(200).json({ ok: true, temporary: true, action, pattern, items });
+      return res.status(200).json({ ok: true, temporary: true, action, pattern, cursor, next_cursor: scan.next_cursor, items });
     }
 
     if (action === "migrate_reviews") {
       const pattern = safePattern(req.query.pattern || "gmb:review:*");
       const count = parseIntParam(req.query.count, 100, 1000);
       const limit = parseIntParam(req.query.limit, 20, 500);
+      const cursor = safeCursor(req.query.cursor);
       const dryRun = req.query.dry_run !== "false";
-      const result = await migrateReviews({ pattern, count, limit, dryRun });
+      const result = await migrateReviews({ pattern, count, limit, cursor, dryRun });
       return res.status(200).json({ ok: true, temporary: true, action, pattern, limit, ...result });
     }
 
