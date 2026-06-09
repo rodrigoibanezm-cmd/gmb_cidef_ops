@@ -23,9 +23,22 @@ function parseIntParam(value, fallback, max) {
   return Math.min(Math.floor(n), max);
 }
 
+function parseOffset(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
 function safeCursor(cursor) {
   const value = typeof cursor === "string" && cursor.trim() ? cursor.trim() : "0";
   if (!/^\d+$/.test(value)) throw new Error("cursor_not_allowed");
+  return value;
+}
+
+function safeDate(date) {
+  const value = typeof date === "string" && date.trim() ? date.trim() : null;
+  if (!value) throw new Error("date_required");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("date_not_allowed");
   return value;
 }
 
@@ -169,12 +182,20 @@ async function inspectKey(key, maxChars) {
   return { key, type, ...asPreview(value, maxChars) };
 }
 
-function parseReview(raw) {
+function parseJson(raw, label) {
   if (typeof raw !== "string" || !raw.trim()) {
-    throw new Error("empty_review_value");
+    throw new Error(`${label}_empty`);
   }
 
   return JSON.parse(raw);
+}
+
+function parseReview(raw) {
+  return parseJson(raw, "review");
+}
+
+function parseSnapshot(raw) {
+  return parseJson(raw, "snapshot");
 }
 
 async function resolveTenantId(placeId) {
@@ -240,6 +261,72 @@ async function upsertMigratedReview(review, tenantId) {
   );
 }
 
+async function upsertMigratedSnapshot(snapshot, tenantId) {
+  await dbQuery(
+    `insert into place_snapshots (
+      tenant_id,
+      place_id,
+      captured_date,
+      captured_at,
+      name,
+      rating,
+      review_count,
+      primary_type,
+      source,
+      raw
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    on conflict (tenant_id, place_id, captured_date)
+    do update set
+      captured_at = excluded.captured_at,
+      name = excluded.name,
+      rating = excluded.rating,
+      review_count = excluded.review_count,
+      primary_type = excluded.primary_type,
+      source = excluded.source,
+      raw = excluded.raw`,
+    [
+      tenantId,
+      snapshot.place_id,
+      snapshot.captured_date,
+      snapshot.captured_at || null,
+      snapshot.name || null,
+      snapshot.rating ?? null,
+      snapshot.review_count ?? 0,
+      snapshot.primary_type || null,
+      snapshot.source || "upstash_snapshot_migration",
+      JSON.stringify(snapshot),
+    ]
+  );
+}
+
+async function upsertMigratedMetric(snapshot, tenantId) {
+  await dbQuery(
+    `insert into place_daily_metrics (
+      tenant_id,
+      place_id,
+      captured_date,
+      rating,
+      review_count,
+      primary_type,
+      updated_at
+    ) values ($1,$2,$3,$4,$5,$6,now())
+    on conflict (tenant_id, place_id, captured_date)
+    do update set
+      rating = excluded.rating,
+      review_count = excluded.review_count,
+      primary_type = excluded.primary_type,
+      updated_at = now()`,
+    [
+      tenantId,
+      snapshot.place_id,
+      snapshot.captured_date,
+      snapshot.rating ?? null,
+      snapshot.review_count ?? 0,
+      snapshot.primary_type || null,
+    ]
+  );
+}
+
 async function migrateReviews({ pattern, count, limit, cursor, dryRun }) {
   const scan = await scanKeys(pattern, count, limit, cursor);
   const result = {
@@ -278,6 +365,82 @@ async function migrateReviews({ pattern, count, limit, cursor, dryRun }) {
 
       if (!dryRun) {
         await upsertMigratedReview(review, tenantId);
+      }
+
+      result.inserted_or_updated += 1;
+    } catch (error) {
+      result.failed += 1;
+      if (result.errors.length < 20) {
+        result.errors.push({ key, error: error.message });
+      }
+    }
+  }
+
+  return result;
+}
+
+async function migrateSnapshots({ tenantId, date, offset, limit, dryRun }) {
+  const indexKey = `gmb:${tenantId}:index:${date}:snapshot_keys`;
+  const rawKeys = await redis(["GET", indexKey]);
+  const keys = parseJson(rawKeys, "snapshot_keys");
+
+  if (!Array.isArray(keys)) {
+    throw new Error("snapshot_keys_not_array");
+  }
+
+  const batch = keys.slice(offset, offset + limit);
+  const result = {
+    tenant_id: tenantId,
+    date,
+    index_key: indexKey,
+    offset,
+    limit,
+    total_keys: keys.length,
+    scanned: batch.length,
+    inserted_or_updated: 0,
+    skipped_other_tenant: 0,
+    skipped_unknown_place: 0,
+    failed: 0,
+    dry_run: dryRun,
+    next_offset: offset + batch.length,
+    done: offset + batch.length >= keys.length,
+    errors: [],
+  };
+
+  const tenantCache = new Map();
+
+  for (const key of batch) {
+    try {
+      if (typeof key !== "string" || !key.startsWith(`gmb:snapshot:${date}:`)) {
+        throw new Error("snapshot_key_not_allowed");
+      }
+
+      const raw = await redis(["GET", key]);
+      const snapshot = parseSnapshot(raw);
+
+      if (!snapshot.place_id || !snapshot.captured_date) {
+        throw new Error("invalid_snapshot_shape");
+      }
+
+      let resolvedTenantId = tenantCache.get(snapshot.place_id);
+      if (resolvedTenantId === undefined) {
+        resolvedTenantId = await resolveTenantId(snapshot.place_id);
+        tenantCache.set(snapshot.place_id, resolvedTenantId);
+      }
+
+      if (!resolvedTenantId) {
+        result.skipped_unknown_place += 1;
+        continue;
+      }
+
+      if (resolvedTenantId !== tenantId) {
+        result.skipped_other_tenant += 1;
+        continue;
+      }
+
+      if (!dryRun) {
+        await upsertMigratedSnapshot(snapshot, tenantId);
+        await upsertMigratedMetric(snapshot, tenantId);
       }
 
       result.inserted_or_updated += 1;
@@ -360,6 +523,16 @@ export default async function handler(req, res) {
       const dryRun = req.query.dry_run !== "false";
       const result = await migrateReviews({ pattern, count, limit, cursor, dryRun });
       return res.status(200).json({ ok: true, temporary: true, action, pattern, limit, ...result });
+    }
+
+    if (action === "migrate_snapshots") {
+      const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
+      const date = safeDate(req.query.date || req.query.captured_date);
+      const offset = parseOffset(req.query.offset);
+      const limit = parseIntParam(req.query.limit, 100, 500);
+      const dryRun = req.query.dry_run !== "false";
+      const result = await migrateSnapshots({ tenantId, date, offset, limit, dryRun });
+      return res.status(200).json({ ok: true, temporary: true, action, ...result });
     }
 
     return res.status(400).json({ ok: false, error: "unknown_action" });
