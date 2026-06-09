@@ -91,6 +91,22 @@ async function scanKeys(pattern, count, maxKeys, startCursor = "0") {
   return { keys, next_cursor: cursor };
 }
 
+async function countKeys(pattern, count) {
+  let cursor = "0";
+  let total = 0;
+  let iterations = 0;
+
+  do {
+    const result = await redis(["SCAN", cursor, "MATCH", pattern, "COUNT", count]);
+    cursor = String(result?.[0] || "0");
+    const batch = Array.isArray(result?.[1]) ? result[1] : [];
+    total += batch.filter((key) => typeof key === "string" && key.startsWith("gmb:review:")).length;
+    iterations += 1;
+  } while (cursor !== "0");
+
+  return { total, iterations };
+}
+
 async function inspectKey(key, maxChars) {
   const type = await redis(["TYPE", key]);
   let value = null;
@@ -247,6 +263,13 @@ export default async function handler(req, res) {
       const cursor = safeCursor(req.query.cursor);
       const scan = await scanKeys(pattern, count, maxKeys, cursor);
       return res.status(200).json({ ok: true, temporary: true, action, pattern, cursor, ...scan });
+    }
+
+    if (action === "count_reviews") {
+      const pattern = safePattern(req.query.pattern || "gmb:review:*");
+      const count = parseIntParam(req.query.count, 1000, 5000);
+      const result = await countKeys(pattern, count);
+      return res.status(200).json({ ok: true, temporary: true, action, pattern, ...result });
     }
 
     if (action === "get") {
