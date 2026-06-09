@@ -29,6 +29,13 @@ function safeCursor(cursor) {
   return value;
 }
 
+function safeTenantId(tenantId) {
+  const value = typeof tenantId === "string" && tenantId.trim() ? tenantId.trim() : null;
+  if (!value) throw new Error("tenant_id_required");
+  if (!/^[a-z0-9_.-]+$/.test(value)) throw new Error("tenant_id_not_allowed");
+  return value;
+}
+
 function safePattern(pattern) {
   const value = typeof pattern === "string" && pattern.trim() ? pattern.trim() : "gmb:review:*";
   if (!value.startsWith("gmb:review:")) throw new Error("pattern_not_allowed");
@@ -105,6 +112,51 @@ async function countKeys(pattern, count) {
   } while (cursor !== "0");
 
   return { total, iterations };
+}
+
+async function countKeysByTenant({ pattern, count, tenantId }) {
+  let cursor = "0";
+  let scanned = 0;
+  let total = 0;
+  let unknown_place = 0;
+  let failed = 0;
+  let iterations = 0;
+  const tenantCache = new Map();
+
+  do {
+    const result = await redis(["SCAN", cursor, "MATCH", pattern, "COUNT", count]);
+    cursor = String(result?.[0] || "0");
+    const batch = Array.isArray(result?.[1]) ? result[1] : [];
+    iterations += 1;
+
+    for (const key of batch) {
+      if (typeof key !== "string" || !key.startsWith("gmb:review:")) continue;
+      scanned += 1;
+
+      try {
+        const raw = await redis(["GET", key]);
+        const review = parseReview(raw);
+        if (!review.place_id) throw new Error("missing_place_id");
+
+        let resolvedTenantId = tenantCache.get(review.place_id);
+        if (resolvedTenantId === undefined) {
+          resolvedTenantId = await resolveTenantId(review.place_id);
+          tenantCache.set(review.place_id, resolvedTenantId);
+        }
+
+        if (!resolvedTenantId) {
+          unknown_place += 1;
+          continue;
+        }
+
+        if (resolvedTenantId === tenantId) total += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+  } while (cursor !== "0");
+
+  return { tenant_id: tenantId, total, scanned, unknown_place, failed, iterations };
 }
 
 async function inspectKey(key, maxChars) {
@@ -269,6 +321,14 @@ export default async function handler(req, res) {
       const pattern = safePattern(req.query.pattern || "gmb:review:*");
       const count = parseIntParam(req.query.count, 1000, 5000);
       const result = await countKeys(pattern, count);
+      return res.status(200).json({ ok: true, temporary: true, action, pattern, ...result });
+    }
+
+    if (action === "count_reviews_by_tenant") {
+      const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
+      const pattern = safePattern(req.query.pattern || "gmb:review:*");
+      const count = parseIntParam(req.query.count, 1000, 5000);
+      const result = await countKeysByTenant({ pattern, count, tenantId });
       return res.status(200).json({ ok: true, temporary: true, action, pattern, ...result });
     }
 
