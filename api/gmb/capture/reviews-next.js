@@ -1,3 +1,5 @@
+import { dbQuery } from "../../../lib/gmb/postgres.js";
+
 function authorized(req) {
   const expected = process.env.CRON_SECRET;
   const provided = req.query.token || req.headers["x-cron-secret"];
@@ -22,8 +24,8 @@ function parseIntParam(value, fallback, max) {
 }
 
 function safePattern(pattern) {
-  const value = typeof pattern === "string" && pattern.trim() ? pattern.trim() : "gmb:*";
-  if (!value.startsWith("gmb:")) throw new Error("pattern_not_allowed");
+  const value = typeof pattern === "string" && pattern.trim() ? pattern.trim() : "gmb:review:*";
+  if (!value.startsWith("gmb:review:")) throw new Error("pattern_not_allowed");
   return value;
 }
 
@@ -96,8 +98,128 @@ async function inspectKey(key, maxChars) {
   return { key, type, ...asPreview(value, maxChars) };
 }
 
+function parseReview(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("empty_review_value");
+  }
+
+  return JSON.parse(raw);
+}
+
+async function resolveTenantId(placeId) {
+  const rows = await dbQuery(
+    `select tenant_id
+     from places
+     where place_id = $1
+     limit 1`,
+    [placeId]
+  );
+
+  return rows[0]?.tenant_id || null;
+}
+
+async function upsertMigratedReview(review, tenantId) {
+  await dbQuery(
+    `insert into place_reviews (
+      tenant_id,
+      place_id,
+      review_hash,
+      captured_date,
+      captured_at,
+      updated_at,
+      author,
+      review_date,
+      rating,
+      text,
+      language,
+      original_text,
+      original_language,
+      source,
+      raw
+    ) values ($1,$2,$3,$4,$5,now(),$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    on conflict (tenant_id, place_id, review_hash)
+    do update set
+      captured_date = excluded.captured_date,
+      updated_at = now(),
+      author = excluded.author,
+      review_date = excluded.review_date,
+      rating = excluded.rating,
+      text = excluded.text,
+      language = excluded.language,
+      original_text = excluded.original_text,
+      original_language = excluded.original_language,
+      source = excluded.source,
+      raw = excluded.raw`,
+    [
+      tenantId,
+      review.place_id,
+      review.review_hash,
+      review.captured_date,
+      review.captured_at || null,
+      review.author || null,
+      review.review_date || null,
+      review.rating || null,
+      review.text || null,
+      review.language || null,
+      review.original_text || null,
+      review.original_language || null,
+      review.source || "upstash_migration",
+      JSON.stringify(review),
+    ]
+  );
+}
+
+async function migrateReviews({ pattern, count, limit, dryRun }) {
+  const keys = await scanKeys(pattern, count, limit);
+  const result = {
+    scanned: keys.length,
+    inserted_or_updated: 0,
+    skipped_unknown_place: 0,
+    failed: 0,
+    dry_run: dryRun,
+    errors: [],
+  };
+
+  const tenantCache = new Map();
+
+  for (const key of keys) {
+    try {
+      const raw = await redis(["GET", key]);
+      const review = parseReview(raw);
+
+      if (!review.place_id || !review.review_hash || !review.captured_date) {
+        throw new Error("invalid_review_shape");
+      }
+
+      let tenantId = tenantCache.get(review.place_id);
+      if (tenantId === undefined) {
+        tenantId = await resolveTenantId(review.place_id);
+        tenantCache.set(review.place_id, tenantId);
+      }
+
+      if (!tenantId) {
+        result.skipped_unknown_place += 1;
+        continue;
+      }
+
+      if (!dryRun) {
+        await upsertMigratedReview(review, tenantId);
+      }
+
+      result.inserted_or_updated += 1;
+    } catch (error) {
+      result.failed += 1;
+      if (result.errors.length < 20) {
+        result.errors.push({ key, error: error.message });
+      }
+    }
+  }
+
+  return result;
+}
+
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
   }
 
@@ -135,6 +257,15 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ ok: true, temporary: true, action, pattern, items });
+    }
+
+    if (action === "migrate_reviews") {
+      const pattern = safePattern(req.query.pattern || "gmb:review:*");
+      const count = parseIntParam(req.query.count, 100, 1000);
+      const limit = parseIntParam(req.query.limit, 20, 500);
+      const dryRun = req.query.dry_run !== "false";
+      const result = await migrateReviews({ pattern, count, limit, dryRun });
+      return res.status(200).json({ ok: true, temporary: true, action, pattern, limit, ...result });
     }
 
     return res.status(400).json({ ok: false, error: "unknown_action" });
