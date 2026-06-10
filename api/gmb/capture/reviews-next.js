@@ -54,6 +54,31 @@ async function handlePreview(req, res) {
   });
 }
 
+async function handlePreviewSnapshotIndexes(req, res) {
+  const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
+  const count = parseIntParam(req.query.count, 100, 1000);
+  const maxKeys = parseIntParam(req.query.max_keys || req.query.limit, 3, 50);
+  const cursor = safeCursor(req.query.cursor);
+  const maxChars = parseIntParam(req.query.max_chars, 3000, 10000);
+  const pattern = `gmb:${tenantId}:index:*:snapshot_keys`;
+  const scan = await scanKeys({ pattern, count, maxKeys, cursor });
+  const items = [];
+
+  for (const key of scan.keys) items.push(await inspectKey(key, maxChars));
+
+  return res.status(200).json({
+    ok: true,
+    temporary: true,
+    action: "preview_snapshot_indexes",
+    tenant_id: tenantId,
+    pattern,
+    cursor,
+    next_cursor: scan.next_cursor,
+    done: scan.done,
+    items,
+  });
+}
+
 async function handleCountReviews(req, res) {
   const pattern = safeReviewPattern(req.query.pattern || "gmb:review:*");
   const count = parseIntParam(req.query.count, 1000, 5000);
@@ -114,6 +139,7 @@ async function handleMigrateSnapshots(req, res) {
 const handlers = {
   scan: handleScan,
   preview: handlePreview,
+  preview_snapshot_indexes: handlePreviewSnapshotIndexes,
   count_reviews: handleCountReviews,
   count_reviews_by_tenant: handleCountReviewsByTenant,
   get: handleGet,
