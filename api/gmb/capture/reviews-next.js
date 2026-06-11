@@ -114,14 +114,25 @@ async function handleGet(req, res) {
 }
 
 async function handleMigrateReviews(req, res) {
+  const tenantId = req.query.tenant_id || req.query.tenant
+    ? safeTenantId(req.query.tenant_id || req.query.tenant)
+    : null;
   const pattern = safeReviewPattern(req.query.pattern || "gmb:review:*");
   const count = parseIntParam(req.query.count, 100, 1000);
   const limit = parseIntParam(req.query.limit, 20, 500);
   const cursor = safeCursor(req.query.cursor);
   const dryRun = req.query.dry_run !== "false";
-  const result = await migrateReviews({ pattern, count, limit, cursor, dryRun });
+  const result = await migrateReviews({ pattern, count, limit, cursor, dryRun, tenantId });
 
-  return res.status(200).json({ ok: true, temporary: true, action: "migrate_reviews", pattern, limit, ...result });
+  return res.status(200).json({
+    ok: true,
+    temporary: true,
+    action: "migrate_reviews",
+    tenant_id: tenantId,
+    pattern,
+    limit,
+    ...result,
+  });
 }
 
 async function handleMigrateSnapshots(req, res) {
