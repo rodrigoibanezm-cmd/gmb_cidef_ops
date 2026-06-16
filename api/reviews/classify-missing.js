@@ -261,7 +261,7 @@ async function handleCommit(req, res) {
   const rebuilds = [];
   const rebuildErrors = [];
 
-  if (inserted.length > 0) {
+  if (saved.length > 0) {
     for (const tenantId of tenants) {
       try {
         rebuilds.push(await rebuildOperationalCards({ tenantId }));
@@ -280,6 +280,7 @@ async function handleCommit(req, res) {
     inserted: inserted.length,
     updated: saved.length - inserted.length,
     failed: errors.length,
+    classification_changed: saved.length > 0,
     new_signal_possible: inserted.length > 0,
     operational_cards_rebuilt: rebuilds.length > 0,
     operational_cards: rebuilds,
