@@ -14,6 +14,7 @@ import {
   countReviewsByTenantPage,
   migrateReviews,
 } from "../../../lib/gmb/migrations/reviewsMigration.js";
+import { migrateIndexedReviews } from "../../../lib/gmb/migrations/indexedReviewsMigration.js";
 import { migrateSnapshots } from "../../../lib/gmb/migrations/snapshotsMigration.js";
 
 function authorized(req) {
@@ -135,6 +136,31 @@ async function handleMigrateReviews(req, res) {
   });
 }
 
+async function handleMigrateIndexedReviews(req, res) {
+  const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
+  const date = safeOptionalDate(req.query.date || req.query.captured_date);
+  const offsetIndexes = parseOffset(req.query.offset_indexes || req.query.offset);
+  const limitIndexes = parseIntParam(req.query.limit_indexes || req.query.limit, 20, 500);
+  const maxIndexes = parseIntParam(req.query.max_indexes, 5000, 20000);
+  const dryRun = req.query.dry_run !== "false";
+
+  const result = await migrateIndexedReviews({
+    tenantId,
+    date,
+    offsetIndexes,
+    limitIndexes,
+    maxIndexes,
+    dryRun,
+  });
+
+  return res.status(200).json({
+    ok: true,
+    temporary: true,
+    action: "migrate_indexed_reviews",
+    ...result,
+  });
+}
+
 async function handleMigrateSnapshots(req, res) {
   const tenantId = safeTenantId(req.query.tenant_id || req.query.tenant);
   const date = safeOptionalDate(req.query.date || req.query.captured_date);
@@ -155,6 +181,7 @@ const handlers = {
   count_reviews_by_tenant: handleCountReviewsByTenant,
   get: handleGet,
   migrate_reviews: handleMigrateReviews,
+  migrate_indexed_reviews: handleMigrateIndexedReviews,
   migrate_snapshots: handleMigrateSnapshots,
 };
 
