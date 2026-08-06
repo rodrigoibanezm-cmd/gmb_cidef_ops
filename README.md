@@ -1,6 +1,6 @@
 # GMB CIDEF OPS
 
-Infraestructura operacional separada del agente/runtime.
+Infraestructura operacional separada del agente/runtime
 
 ## Responsabilidad
 
